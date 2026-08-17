@@ -1,0 +1,97 @@
+# =============================================================================
+# Nifty 100 Financial Intelligence Platform - .gitignore
+# =============================================================================
+
+# --- Python Bytecode & Caches ---
+**__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+*.pyd
+
+# --- Testing Caches ---
+.pytest_cache/
+.coverage
+htmlcov/
+coverage.xml
+*.cover
+.tox/
+.nox/
+
+# --- Virtual Environments ---
+.venv/
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# --- Database Files ---
+*.db
+*.sqlite
+*.sqlite3
+db/*.db
+db/*.sqlite
+
+# --- Data Files (raw, interim, processed) ---
+*.csv
+*.xlsx
+*.xls
+*.parquet
+*.feather
+*.pkl
+*.pickle
+data/raw/*
+data/processed/*
+data/interim/*
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+!data/interim/.gitkeep
+
+# --- Generated Output ---
+# Ignore contents of logs/, output/, reports/generated but keep the
+# directories themselves (via .gitkeep files) so they exist on clone.
+logs/*
+output/*
+reports/generated/*
+!logs/.gitkeep
+!output/.gitkeep
+!reports/generated/
+
+# --- IDE & Editor ---
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# --- Jupyter Notebook Checkpoints ---
+.ipynb_checkpoints/
+*/.ipynb_checkpoints/*
+
+# --- Distribution & Build ---
+build/
+dist/
+*.egg-info/
+*.egg
+.eggs/
+
+# --- MyPy & Type Checkers ---
+.mypy_cache/
+.ruff_cache/
+.pyre/
+.pytype/
+
+# --- Pre-commit ---
+.pre-commit-config.yaml.local
+
+# --- Environment Files (secrets) ---
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# --- Streamlit ---
+.streamlit/secrets.toml

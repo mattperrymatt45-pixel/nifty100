@@ -1,0 +1,156 @@
+# =============================================================================
+# Nifty 100 Financial Intelligence Platform - Project Configuration
+# =============================================================================
+
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "nifty100-platform"
+version = "0.1.0"
+description = "Nifty 100 Financial Intelligence Platform - ETL, Analytics, Dashboard & API"
+readme = "README.md"
+requires-python = ">=3.12"
+license = { text = "Proprietary" }
+authors = [
+    { name = "Data Engineering Team" },
+]
+keywords = ["nifty", "finance", "etl", "analytics", "dashboard", "fastapi", "streamlit"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Financial and Insurance Industry",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Office/Business :: Financial :: Investment",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["src*"]
+
+# -----------------------------------------------------------------------------
+# Black - Code Formatter
+# -----------------------------------------------------------------------------
+[tool.black]
+line-length = 100
+target-version = ["py312"]
+include = '\.pyi?$'
+exclude = '''
+/(
+    \.git
+  | \.venv
+  | venv
+  | env
+  | build
+  | dist
+  | migrations
+  | __pycache__
+)/
+'''
+
+# -----------------------------------------------------------------------------
+# Ruff - Linter & Import Sorter
+# -----------------------------------------------------------------------------
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["src", "tests"]
+exclude = [
+    ".git",
+    ".venv",
+    "venv",
+    "env",
+    "build",
+    "dist",
+    "__pycache__",
+]
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes
+    "I",    # isort imports
+    "N",    # pep8-naming
+    "D",    # pydocstyle
+    "UP",   # pyupgrade
+    "B",    # flake8-bugbear
+    "SIM",  # flake8-simplify
+    "RUF",  # ruff-specific rules
+]
+ignore = [
+    "D100",  # Undocumented public module
+    "D104",  # Missing docstring in public package
+    "D107",  # Missing docstring in __init__
+    "D203",  # Conflicts with D211
+    "D212",  # Multi-line summary placement (style preference)
+    "D213",  # Multi-line summary placement (conflicts with D212)
+    "D205",  # Blank line after summary (overly strict)
+    "D401",  # Imperative mood (style)
+    "D413",  # Blank line after last section (style)
+    "D102",  # Missing docstring in public method
+    "D103",  # Missing docstring in public function
+    "D105",  # Missing docstring in magic method
+]
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401", "F403"]
+"tests/*" = ["D", "S101"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["src"]
+known-third-party = ["pandas", "numpy", "sqlalchemy", "fastapi", "streamlit", "plotly"]
+
+# -----------------------------------------------------------------------------
+# Pytest - Testing
+# -----------------------------------------------------------------------------
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["tests"]
+python_files = ["test_*.py", "*_test.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "-ra",
+    "--strict-markers",
+    "--strict-config",
+    "--tb=short",
+    "--cov=src",
+    "--cov-report=term-missing",
+]
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "etl: marks tests related to ETL pipelines",
+    "db: marks tests that require a database connection",
+    "api: marks tests for API endpoints",
+]
+filterwarnings = [
+    "ignore::DeprecationWarning",
+    "ignore::PendingDeprecationWarning",
+]
+
+[tool.coverage.run]
+source = ["src"]
+branch = true
+omit = [
+    "*/__init__.py",
+    "tests/*",
+]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = false
+fail_under = 0  # Raise to 70+ once tests exist
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+    "pass",
+]
+
+[tool.coverage.html]
+directory = "htmlcov"
