@@ -1,8 +1,8 @@
 """ETL pipeline package (Sprint 1, Days 2-7).
 
-Public API for Day 2 (Excel loader & normalisers):
-
+Public API:
     from src.etl import normalize_ticker, normalize_year, load_excel, load_dataset
+    from src.etl import validate_all, registered_rules, DQFailure
 """
 
 from src.etl.exceptions import (
@@ -26,10 +26,16 @@ from src.etl.normalizers import (
     normalize_year,
     normalize_year_safe,
 )
+from src.etl.validation import (
+    DQFailure,
+    registered_rules,
+    validate_all,
+)
 
 __all__ = [
     "DATASET_SPECS",
     "YEAR_PARSE_ERROR",
+    "DQFailure",
     "ETLError",
     "LoaderError",
     "SchemaError",
@@ -43,4 +49,6 @@ __all__ = [
     "normalize_ticker_safe",
     "normalize_year",
     "normalize_year_safe",
+    "registered_rules",
+    "validate_all",
 ]
