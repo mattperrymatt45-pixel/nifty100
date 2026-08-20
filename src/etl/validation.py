@@ -368,23 +368,14 @@ def dq06_positive_sales(tables: TableBundle) -> list[DQFailure]:
 @register_rule("DQ-07")
 def dq07_year_format(tables: TableBundle) -> list[DQFailure]:
     failures: list[DQFailure] = []
-    for table in (
-        "profitandloss",
-        "balancesheet",
-        "cashflow",
-        "documents",
-        "market_cap",
-        "financial_ratios",
-    ):
+    # DQ-07 applies only to tables using the 'YYYY-MM' financial-year label
+    # (normalized by normalize_year). Snapshot tables and calendar-year INT
+    # columns (documents.Year, market_cap.year) are not checked here.
+    for table in ("profitandloss", "balancesheet", "cashflow", "financial_ratios"):
         df = tables.get(table)
         if df is None or not _has(df, "year"):
-            # documents uses 'Year'; check for that too
-            if table == "documents" and df is not None and _has(df, "Year"):
-                year_col = "Year"
-            else:
-                continue
-        else:
-            year_col = "year"
+            continue
+        year_col = "year"
         yr_series = df[year_col].astype(str)
         bad = ~_year_matches(yr_series) | (yr_series == YEAR_PARSE_ERROR)
         for idx in df.index[bad]:

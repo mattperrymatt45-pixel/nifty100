@@ -3,7 +3,7 @@
 # Common developer commands. Run `make help` to see all targets.
 # =============================================================================
 
-.PHONY: help install install-dev test lint format clean run-dashboard run-api
+.PHONY: help install install-dev test lint format clean run-dashboard run-api load load-reset
 
 # Default target
 help:
@@ -18,6 +18,8 @@ help:
 	@echo "  make clean          Remove Python caches, build artifacts, and coverage files"
 	@echo "  make run-dashboard  Launch the Streamlit dashboard"
 	@echo "  make run-api        Launch the FastAPI server with Uvicorn"
+	@echo "  make load           Run ETL pipeline (idempotent)"
+	@echo "  make load-reset     Fresh ETL run: truncate tables then load"
 	@echo ""
 
 # ---- Dependency Installation ----
@@ -63,3 +65,11 @@ run-dashboard:
 
 run-api:
 	uvicorn src.api.main:app --host 0.0.0.0 --port 8000 --reload
+
+# ---- ETL ----
+
+load:          ## Run the ETL pipeline (idempotent — appends, deduplicates on PK)
+	python -m scripts.run_etl
+
+load-reset:    ## Truncate all tables then run the ETL pipeline (fresh load)
+	python -m scripts.run_etl --reset

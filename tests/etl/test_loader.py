@@ -284,8 +284,10 @@ class TestDatasetRegistry:
         assert DATASET_SPECS["companies"].normalize_id == "id"
         assert DATASET_SPECS["companies"].normalize_year_col is None
 
-    def test_documents_uses_capital_y_year(self) -> None:
-        assert DATASET_SPECS["documents"].normalize_year_col == "Year"
+    def test_documents_year_is_calendar_int_not_normalized(self) -> None:
+        """documents.Year is a calendar-year integer, not a 'Mar-23' FY label,
+        so the FY-year normalizer should NOT be applied to it."""
+        assert DATASET_SPECS["documents"].normalize_year_col is None
 
     def test_available_datasets_sorted(self) -> None:
         names = available_datasets()

@@ -113,7 +113,7 @@ DATASET_SPECS: dict[str, DatasetSpec] = {
         sheet="Documents",
         header=1,
         normalize_id="company_id",
-        normalize_year_col="Year",  # capital-Y per spec §5.6
+        normalize_year_col=None,  # 'Year' is a calendar-year INT, not an FY label
     ),
     "prosandcons": DatasetSpec(
         name="prosandcons",
@@ -148,7 +148,7 @@ DATASET_SPECS: dict[str, DatasetSpec] = {
         sheet=None,
         header=0,
         normalize_id="company_id",
-        normalize_year_col="year",
+        normalize_year_col=None,  # 'year' is calendar-year INT (2019-2024)
         is_supplementary=True,
     ),
     "financial_ratios": DatasetSpec(

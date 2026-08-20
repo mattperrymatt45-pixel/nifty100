@@ -3,8 +3,18 @@
 Public API:
     from src.etl import normalize_ticker, normalize_year, load_excel, load_dataset
     from src.etl import validate_all, registered_rules, DQFailure
+    from src.etl import (get_connection, init_schema, load_dataframe,
+                         reset_tables, table_rowcount)
 """
 
+from src.etl.database import (
+    get_connection,
+    init_schema,
+    load_dataframe,
+    reset_tables,
+    table_rowcount,
+    write_load_audit,
+)
 from src.etl.exceptions import (
     ETLError,
     LoaderError,
@@ -43,6 +53,9 @@ __all__ = [
     "YearParseError",
     "available_datasets",
     "dataset_spec",
+    "get_connection",
+    "init_schema",
+    "load_dataframe",
     "load_dataset",
     "load_excel",
     "normalize_ticker",
@@ -50,5 +63,8 @@ __all__ = [
     "normalize_year",
     "normalize_year_safe",
     "registered_rules",
+    "reset_tables",
+    "table_rowcount",
     "validate_all",
+    "write_load_audit",
 ]
