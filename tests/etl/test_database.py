@@ -227,6 +227,75 @@ def test_load_dataframe_empty_df(init_db):
     assert stats["rows_loaded"] == 0
 
 
+def test_load_dataframe_idempotent_merge(init_db):
+    """Loading the same data twice must NOT duplicate rows (PK-based merge)."""
+    # Seed parent
+    load_dataframe(
+        pd.DataFrame(
+            {"id": ["TCS", "INFY"], "company_name": ["Tata", "Infosys"], "face_value": [1, 5]}
+        ),
+        "companies",
+        db_path=init_db,
+    )
+    pl = pd.DataFrame(
+        {
+            "company_id": ["TCS", "INFY"],
+            "year": ["2023-03", "2023-03"],
+            "sales": [100.0, 50.0],
+            "expenses": [80.0, 40.0],
+            "operating_profit": [20.0, 10.0],
+            "opm_percentage": [20.0, 20.0],
+        }
+    )
+    load_dataframe(pl, "profitandloss", db_path=init_db)
+    assert table_rowcount("profitandloss", db_path=init_db) == 2
+    # Second load of the same data should replace, not duplicate
+    stats = load_dataframe(pl, "profitandloss", db_path=init_db)
+    assert stats["rows_deleted"] == 2
+    assert table_rowcount("profitandloss", db_path=init_db) == 2
+
+
+def test_load_dataframe_merge_updates_values(init_db):
+    """After merge, new values win over old values for the same PK."""
+    load_dataframe(
+        pd.DataFrame({"id": ["TCS"], "company_name": ["Old"], "face_value": [1]}),
+        "companies",
+        db_path=init_db,
+    )
+    load_dataframe(
+        pd.DataFrame({"id": ["TCS"], "company_name": ["New"], "face_value": [10]}),
+        "companies",
+        db_path=init_db,
+    )
+    with get_connection(init_db) as conn:
+        name, fv = conn.execute(
+            "SELECT company_name, face_value FROM companies WHERE id='TCS'"
+        ).fetchone()
+    assert name == "New"
+    assert fv == 10
+    assert table_rowcount("companies", db_path=init_db) == 1
+
+
+def test_documents_capital_year_merge(init_db):
+    """Documents uses capital-Y 'Year'; idempotent merge must work."""
+    load_dataframe(
+        pd.DataFrame({"id": ["TCS"], "company_name": ["Tata"], "face_value": [1]}),
+        "companies",
+        db_path=init_db,
+    )
+    docs = pd.DataFrame(
+        {
+            "id": [1, 2],
+            "company_id": ["TCS", "TCS"],
+            "Year": [2023, 2024],
+            "Annual_Report": ["http://x", "http://y"],
+        }
+    )
+    load_dataframe(docs, "documents", db_path=init_db)
+    load_dataframe(docs, "documents", db_path=init_db)  # idempotent
+    assert table_rowcount("documents", db_path=init_db) == 2
+
+
 # ---------------------------------------------------------------------------
 # reset_tables & audit
 # ---------------------------------------------------------------------------

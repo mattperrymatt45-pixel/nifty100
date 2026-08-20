@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""End-to-end ETL entry point (Sprint 1, Days 2-4).
+"""End-to-end ETL entry point (Sprint 1, Days 2-5).
 
 Loads all 12 datasets from ``data/raw/``, normalises tickers/years,
 initialises the SQLite database schema, bulk-loads all tables,
-runs DQ validation, and writes an audit trail.
+runs DQ validation, and writes a load_audit trail (DB + CSV).
 
 Usage (from project root)::
 
@@ -17,14 +17,15 @@ from __future__ import annotations
 import argparse
 import sys
 import time
+from datetime import UTC, datetime
 from pathlib import Path
+
+import pandas as pd
 
 # Ensure project root is importable when invoked as a script
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
-
-import pandas as pd  # noqa: E402
 
 from src.etl import (  # noqa: E402
     DATASET_SPECS,
@@ -32,6 +33,7 @@ from src.etl import (  # noqa: E402
     load_dataset,
 )
 from src.etl.database import (  # noqa: E402
+    get_connection,
     init_schema,
     load_dataframe,
     reset_tables,
@@ -44,6 +46,24 @@ from src.utils.config import settings  # noqa: E402
 from src.utils.logger import get_logger  # noqa: E402
 
 logger = get_logger(__name__)
+
+# Load order: parent/snapshot tables first, then time-series children.
+# companies is the only FK parent; dimensions are loaded before facts for
+# readability and so any future intra-child FKs resolve cleanly.
+LOAD_ORDER: list[str] = [
+    "companies",
+    "sectors",
+    "analysis",
+    "peer_groups",
+    "prosandcons",
+    "documents",
+    "market_cap",
+    "profitandloss",
+    "balancesheet",
+    "cashflow",
+    "financial_ratios",
+    "stock_prices",
+]
 
 
 def _normalize_documents_year(df: pd.DataFrame) -> pd.DataFrame:
@@ -61,9 +81,9 @@ def _normalize_market_cap_year(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def _normalize_analysis(df: pd.DataFrame) -> pd.DataFrame:
-    """Analysis.xlsx has an ``id`` column that's a row-id, not a ticker — drop it."""
-    if "id" in df.columns and "company_id" in df.columns:
-        df = df.drop(columns=["id"])
+    """Analysis.xlsx: coerce ``id`` to integer (source row id, not a PK)."""
+    if "id" in df.columns:
+        df["id"] = pd.to_numeric(df["id"], errors="coerce")
     return df
 
 
@@ -103,8 +123,10 @@ def run(
     tables: dict[str, pd.DataFrame] = {}
     audit_entries: list[dict] = []
 
-    # 2. Companies must be loaded first (FK parent for all others)
-    ordered = ["companies"] + [n for n in targets if n != "companies"]
+    # 2. Load order: parent/snapshot tables first, then time-series children.
+    ordered = [n for n in LOAD_ORDER if n in targets]
+    # Include any unexpected targets at the end (defensive)
+    ordered += [n for n in targets if n not in ordered]
 
     for name in ordered:
         t0 = time.perf_counter()
@@ -145,7 +167,9 @@ def run(
 
     # Also persist DQ failures to DB (validation_failures table)
     if summary["failures"]:
-        # Translate dict keys to the SQL schema (column vs column_name)
+        # Translate dict keys to the SQL schema (validation_failures columns).
+        # DQFailure uses `table`/`column`/`timestamp`; the DB schema uses
+        # `table_name`/`column_name`/`reported_at`.
         col_map = {
             "rule_id": "rule_id",
             "table": "table_name",
@@ -157,10 +181,17 @@ def run(
             "expected": "expected",
             "actual": "actual",
             "row_index": "row_index",
+            "timestamp": "reported_at",
         }
         vf_db = pd.DataFrame(
             [{sql_k: f.get(k) for k, sql_k in col_map.items()} for f in summary["failures"]]
         )
+        # Ensure reported_at is stamped (NOT NULL column)
+        now_iso = datetime.now(UTC).replace(tzinfo=None).isoformat(timespec="seconds") + "Z"
+        if "reported_at" not in vf_db.columns:
+            vf_db["reported_at"] = now_iso
+        else:
+            vf_db["reported_at"] = vf_db["reported_at"].fillna(now_iso)
         # Append (don't dedupe — history is preserved)
         load_dataframe(vf_db, "validation_failures", deduplicate=False)
 
@@ -168,6 +199,14 @@ def run(
     for entry in audit_entries:
         entry["rows_out"] = table_rowcount(entry["table"])
     write_load_audit(audit_entries)
+
+    # 5. Export load_audit table to CSV (Day 5 deliverable) alongside
+    #    validation_failures.csv so analysts have a single-folder audit trail.
+    audit_csv = settings.PROCESSED_DATA_DIR / "load_audit.csv"
+    with get_connection() as conn:
+        audit_df = pd.read_sql_query("SELECT * FROM load_audit ORDER BY id DESC LIMIT 1000", conn)
+    audit_df.to_csv(audit_csv, index=False)
+    logger.info(f"Wrote load_audit CSV: {audit_csv} ({len(audit_df)} rows)")
 
     total_runtime = round(time.perf_counter() - start, 3)
     logger.info(
@@ -191,6 +230,7 @@ def run(
     )
     print(f"DB: {settings.DB_PATH}")
     print(f"Validation CSV: {vf_path}")
+    print(f"Load audit CSV: {audit_csv}")
 
     return {
         "audit": audit_entries,

@@ -18,6 +18,7 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from datetime import UTC
 from pathlib import Path
+from typing import Any
 
 import pandas as pd
 
@@ -245,6 +246,103 @@ def _clean_for_sqlite(
     return out
 
 
+def _pk_for_table(table: str, df_cols: list[str]) -> list[str] | None:
+    """Return the primary-key columns for ``table`` (case-insensitive lookup).
+
+    Matches column names from ``df_cols`` (which may differ in case from our
+    canonical names). Returns ``None`` for append-only audit tables.
+    """
+    cols_lower = {c.lower(): c for c in df_cols}
+
+    def _resolve(*names_lower: str) -> list[str] | None:
+        resolved = [cols_lower[n] for n in names_lower if n in cols_lower]
+        return resolved if len(resolved) == len(names_lower) else None
+
+    if table == "companies":
+        return _resolve("id")
+    if table in (
+        "profitandloss",
+        "balancesheet",
+        "cashflow",
+        "market_cap",
+        "financial_ratios",
+    ):
+        return _resolve("company_id", "year")
+    if table == "stock_prices":
+        return _resolve("company_id", "date")
+    if table == "documents":
+        return _resolve("company_id", "year")  # matches capital-Y "Year" case-insensitively
+    if table == "peer_groups":
+        return _resolve("company_id", "peer_group_name")
+    if table in ("sectors", "analysis"):
+        return _resolve("company_id")
+    if table == "prosandcons":
+        return _resolve("id") if "id" in cols_lower else None
+    return None  # append-only audit / validation tables
+
+
+def _delete_existing_pks(
+    conn: sqlite3.Connection, table: str, pk_cols: list[str], cleaned: pd.DataFrame
+) -> int:
+    """Delete existing rows whose PKs appear in ``cleaned``; return # deleted.
+
+    Uses a temporary table + correlated DELETE to avoid SQLite's
+    SQLITE_MAX_EXPR_DEPTH limit (which we hit on large tables like
+    stock_prices / documents when using OR'd tuples).
+    """
+    if cleaned.empty or not pk_cols:
+        return 0
+
+    pk_df = cleaned[pk_cols].drop_duplicates().dropna(how="any")
+    if pk_df.empty:
+        return 0
+
+    # Quote columns to handle e.g. capital-"Y" ``Year``.
+    quoted_cols = [f'"{c}"' for c in pk_cols]
+    tmp = f"_tmp_pks_{table}"
+    col_defs = ", ".join(f"{qc} TEXT" for qc in quoted_cols)
+    conn.execute(f"DROP TABLE IF EXISTS {tmp}")
+    conn.execute(f"CREATE TEMP TABLE {tmp} ({col_defs})")
+
+    placeholders = ",".join("?" for _ in pk_cols)
+    insert_sql = f"INSERT INTO {tmp} VALUES ({placeholders})"
+    batch_size = 900
+    batch: list[tuple] = []
+    for _, row in pk_df.iterrows():
+        tup = tuple(_coerce_for_sqlite(v) for v in row.tolist())
+        batch.append(tup)
+        if len(batch) >= batch_size:
+            conn.executemany(insert_sql, batch)
+            batch = []
+    if batch:
+        conn.executemany(insert_sql, batch)
+
+    join_cond = " AND ".join(f"{table}.{qc} = {tmp}.{qc}" for qc in quoted_cols)
+    cur = conn.execute(
+        f"DELETE FROM {table} WHERE EXISTS (" f"SELECT 1 FROM {tmp} WHERE {join_cond})"
+    )
+    deleted = cur.rowcount
+    conn.execute(f"DROP TABLE {tmp}")
+    return deleted
+
+
+def _coerce_for_sqlite(v: Any) -> Any:
+    """Coerce numpy/pandas scalars to plain Python types for sqlite3."""
+    if v is None:
+        return None
+    if isinstance(v, (int, float, str, bytes)):
+        return v
+    # numpy/pandas types
+    if hasattr(v, "item"):
+        try:
+            return v.item()
+        except (ValueError, TypeError):
+            pass
+    if pd.isna(v):
+        return None
+    return str(v)
+
+
 def load_dataframe(
     df: pd.DataFrame,
     table: str,
@@ -252,6 +350,7 @@ def load_dataframe(
     db_path: Path | str | None = None,
     if_exists: str = "append",
     deduplicate: bool = True,
+    merge: bool = True,
 ) -> dict[str, int]:
     """Load ``df`` into ``table`` and return row-count statistics.
 
@@ -260,15 +359,28 @@ def load_dataframe(
         table:       Target table name.
         db_path:     Override DB path (defaults to ``settings.DB_PATH``).
         if_exists:   pandas ``to_sql`` policy: ``'append'`` (default),
-                     ``'replace'``, or ``'fail'``.
-        deduplicate: If True (default), drop PK duplicates keeping last.
+                     ``'replace'``, or ``'fail'``. Only used when ``merge=False``.
+        deduplicate: If True (default), drop PK duplicates keeping last within
+                     the incoming DataFrame (DQ-02 behaviour).
+        merge:       If True (default), delete existing rows whose PKs appear
+                     in ``df`` before inserting. This makes repeated loads
+                     idempotent ("upsert" via delete+insert). Audit tables
+                     (load_audit, validation_failures) ignore this and always
+                     append.
 
     Returns:
-        Dict with keys: ``table``, ``rows_in``, ``rows_loaded``, ``rows_dropped``.
+        Dict with keys: ``table``, ``rows_in``, ``rows_loaded``, ``rows_dropped``,
+        ``rows_deleted``.
     """
     if df is None or df.empty:
         logger.warning(f"load_dataframe({table}): empty DataFrame — nothing written")
-        return {"table": table, "rows_in": 0, "rows_loaded": 0, "rows_dropped": 0}
+        return {
+            "table": table,
+            "rows_in": 0,
+            "rows_loaded": 0,
+            "rows_dropped": 0,
+            "rows_deleted": 0,
+        }
 
     rows_in = len(df)
 
@@ -277,22 +389,34 @@ def load_dataframe(
     cleaned = _clean_for_sqlite(df, table, db_path=db_path)
     rows_dropped = rows_in - len(cleaned)
 
+    # Resolve PK for merge strategy.
+    pk_cols = _pk_for_table(table, list(cleaned.columns)) if merge else None
+
+    rows_deleted = 0
     with get_connection(db_path) as conn:
+        if pk_cols:
+            rows_deleted = _delete_existing_pks(conn, table, pk_cols, cleaned)
+            if rows_deleted:
+                logger.debug(f"{table}: deleted {rows_deleted} existing rows for merge")
         cleaned.to_sql(
             table,
             conn,
-            if_exists=if_exists,
+            if_exists="append",
             index=False,
             chunksize=1000,
         )
         conn.commit()
 
-    logger.info(f"Loaded {table}: {len(cleaned)} rows written ({rows_dropped} dropped)")
+    logger.info(
+        f"Loaded {table}: {len(cleaned)} rows written "
+        f"({rows_dropped} dropped, {rows_deleted} replaced)"
+    )
     return {
         "table": table,
         "rows_in": rows_in,
         "rows_loaded": len(cleaned),
         "rows_dropped": rows_dropped,
+        "rows_deleted": rows_deleted,
     }
 
 

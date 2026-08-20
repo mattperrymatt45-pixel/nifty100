@@ -514,19 +514,30 @@ class TestDQ14:
 
 
 # ---------------------------------------------------------------------------
-# DQ-15 strict balance info
+# DQ-15 strict balance info (aggregate counter per spec p.28)
 # ---------------------------------------------------------------------------
 class TestDQ15:
-    def test_exact_balance_reports_info(self, good_bs) -> None:
+    def test_exact_balance_reports_one_info(self, good_bs) -> None:
+        """DQ-15 emits a single INFO counter (not one-per-row)."""
         failures = dq15_strict_balance_info({"balancesheet": good_bs})
-        # Every row in good_bs balances exactly → INFO per row
-        assert len(failures) == len(good_bs)
-        assert all(f.severity == "INFO" for f in failures)
-        assert all(f.rule_id == "DQ-15" for f in failures)
+        assert len(failures) == 1
+        f = failures[0]
+        assert f.severity == "INFO"
+        assert f.rule_id == "DQ-15"
+        assert f.table == "balancesheet"
+        # Counter value equals the number of exactly-balanced rows
+        assert f.actual == len(good_bs)
 
-    def test_inexact_balance_no_info(self) -> None:
+    def test_no_exact_balance_still_reports_zero_info(self) -> None:
+        """Even when zero rows balance exactly we report an INFO counter."""
         bs = pd.DataFrame({"total_assets": [1000.0], "total_liabilities": [1005.0]})
-        assert dq15_strict_balance_info({"balancesheet": bs}) == []
+        failures = dq15_strict_balance_info({"balancesheet": bs})
+        assert len(failures) == 1
+        assert failures[0].actual == 0
+        assert failures[0].severity == "INFO"
+
+    def test_missing_table_noop(self) -> None:
+        assert dq15_strict_balance_info({}) == []
 
 
 # ---------------------------------------------------------------------------

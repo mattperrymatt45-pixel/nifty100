@@ -678,36 +678,34 @@ def dq14_eps_sign_consistency(tables: TableBundle) -> list[DQFailure]:
 
 # ---------------------------------------------------------------------------
 # DQ-15: BSE/ASE strict balance (INFO)
-# Informational count of rows where total_liabilities == total_assets exactly.
-# Surfaces "perfect" balances for QA reference (DQ-04 is the warning gate).
+# Informational counter (per spec §14, page 28): "Flag in load_audit only."
+# Returns at most one INFO-level failure summarising how many rows balance
+# exactly (assets == liabilities), rather than flooding the audit table
+# with one message per row.
 # ---------------------------------------------------------------------------
 @register_rule("DQ-15")
 def dq15_strict_balance_info(tables: TableBundle) -> list[DQFailure]:
-    failures: list[DQFailure] = []
     df = tables.get("balancesheet")
     if df is None or not _has(df, "total_assets") or not _has(df, "total_liabilities"):
-        return failures
+        return []
     ta = _coerce_numeric(df["total_assets"])
     tl = _coerce_numeric(df["total_liabilities"])
-    exact = ta == tl
-    for idx in df.index[exact.fillna(False)]:
-        cid = df.at[idx, "company_id"] if _has(df, "company_id") else None
-        yr = df.at[idx, "year"] if _has(df, "year") else None
-        failures.append(
-            DQFailure(
-                rule_id="DQ-15",
-                table="balancesheet",
-                severity="INFO",
-                message="Balance sheet matches exactly (assets = liabilities)",
-                company_id=None if pd.isna(cid) else str(cid),
-                year=None if pd.isna(yr) else str(yr),
-                column="total_assets,total_liabilities",
-                expected="informational",
-                actual=float(ta.at[idx]),
-                row_index=int(idx),
-            )
+    exact_count = int(((ta - tl).abs() < 1e-9).fillna(False).sum())
+    return [
+        DQFailure(
+            rule_id="DQ-15",
+            table="balancesheet",
+            severity="INFO",
+            message=(
+                f"{exact_count} of {len(df)} balance sheet rows balance "
+                "exactly (assets = liabilities)"
+            ),
+            column="total_assets,total_liabilities",
+            expected="informational counter (flagged in load_audit)",
+            actual=exact_count,
+            row_index=None,
         )
-    return failures
+    ]
 
 
 # ---------------------------------------------------------------------------
