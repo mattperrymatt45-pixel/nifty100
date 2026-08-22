@@ -17,6 +17,8 @@ Usage (from project root)::
 from __future__ import annotations
 
 import argparse
+import contextlib
+import shutil
 import sys
 import time
 from datetime import UTC, datetime
@@ -248,9 +250,18 @@ def run(
                 }
             )
 
-    # 3. Run DQ validation across all loaded tables
-    vf_path = settings.PROCESSED_DATA_DIR / "validation_failures.csv"
+    # 3. Run DQ validation across all loaded tables. The canonical CSV is
+    #    written to OUTPUT_DIR (deliverable location) and a mirror copy is
+    #    kept in PROCESSED_DATA_DIR so the working dataset directory is
+    #    self-contained.
+    output_dir = settings.OUTPUT_DIR
+    output_dir.mkdir(parents=True, exist_ok=True)
+    vf_path = output_dir / "validation_failures.csv"
+    vf_path_processed = settings.PROCESSED_DATA_DIR / "validation_failures.csv"
     summary = validate_all(tables, output_path=vf_path)
+    # Mirror a copy into data/processed for working-directory convenience.
+    with contextlib.suppress(OSError):
+        shutil.copyfile(vf_path, vf_path_processed)
     logger.info(
         f"DQ summary: {summary['critical']} CRITICAL / "
         f"{summary['warning']} WARNING / {summary['info']} INFO — "
@@ -292,28 +303,37 @@ def run(
         entry["rows_out"] = table_rowcount(entry["table"])
     write_load_audit(audit_entries)
 
-    # 5. Export audit CSVs to PROCESSED_DATA_DIR so analysts have a
-    #    single-folder audit trail.
+    # 5. Export audit CSVs to OUTPUT_DIR (deliverable location) and mirror
+    #    to PROCESSED_DATA_DIR for working-directory convenience.
+    output_dir = settings.OUTPUT_DIR
+    output_dir.mkdir(parents=True, exist_ok=True)
     processed = settings.PROCESSED_DATA_DIR
     processed.mkdir(parents=True, exist_ok=True)
 
-    # 5a. load_audit.csv (every load appended; we export the latest run)
-    audit_csv = processed / "load_audit.csv"
+    def _mirror_csv(src_df: pd.DataFrame, name: str) -> Path:
+        """Write ``df`` to both OUTPUT_DIR and PROCESSED_DATA_DIR; return output path."""
+        out = output_dir / name
+        prc = processed / name
+        src_df.to_csv(out, index=False)
+        with contextlib.suppress(OSError):
+            src_df.to_csv(prc, index=False)
+        return out
+
+    # 5a. load_audit.csv (latest 1000 entries)
     with get_connection() as conn:
         audit_df = pd.read_sql_query("SELECT * FROM load_audit ORDER BY id DESC LIMIT 1000", conn)
-    audit_df.to_csv(audit_csv, index=False)
+    audit_csv = _mirror_csv(audit_df, "load_audit.csv")
     logger.info(f"Wrote load_audit CSV: {audit_csv} ({len(audit_df)} rows)")
 
     # 5b. parse_failures.csv — rows rejected before DB insert (DQ-07 / DQ-08)
-    parse_csv = processed / "parse_failures.csv"
+    pf_cols = ["table", "company_id", "column", "raw_value", "reason", "detected_at"]
     if parse_failures:
         pf_df = pd.DataFrame(parse_failures)
-        pf_df.to_csv(parse_csv, index=False)
+        parse_csv = _mirror_csv(pf_df, "parse_failures.csv")
         logger.info(f"Wrote parse_failures CSV: {parse_csv} ({len(pf_df)} rejected rows)")
     else:
-        pd.DataFrame(
-            columns=["table", "company_id", "column", "raw_value", "reason", "detected_at"]
-        ).to_csv(parse_csv, index=False)
+        empty_pf = pd.DataFrame(columns=pf_cols)
+        parse_csv = _mirror_csv(empty_pf, "parse_failures.csv")
         logger.info(f"No parse failures. Empty report written to {parse_csv}")
 
     total_runtime = round(time.perf_counter() - start, 3)
@@ -342,7 +362,6 @@ def run(
     print(f"Validation CSV: {vf_path}")
     print(f"Load audit CSV: {audit_csv}")
     print(f"Parse failures CSV: {parse_csv}")
-
     return {
         "audit": audit_entries,
         "dq": summary,
