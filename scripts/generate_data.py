@@ -890,67 +890,79 @@ def _write_supp(df: pd.DataFrame, path: Path, sheet: str = "Sheet1") -> None:
         df.to_excel(xw, sheet_name=sheet, index=False)
 
 
+def generate_all(raw_root: Path | None = None) -> dict[str, int]:
+    """Generate all 12 synthetic Excel files under ``raw_root``.
+
+    Returns a dict mapping dataset name → row count. If ``raw_root`` is
+    None, writes to the default ``data/raw/`` location.
+    """
+    if raw_root is None:
+        raw_root = RAW_DIR
+        sup_root = SUP_DIR
+    else:
+        raw_root = Path(raw_root)
+        sup_root = raw_root / "supporting datasets"
+    raw_root.mkdir(parents=True, exist_ok=True)
+    sup_root.mkdir(parents=True, exist_ok=True)
+
+    counts: dict[str, int] = {}
+
+    comp = gen_companies()
+    _write_core(comp, raw_root / "companies.xlsx", "Companies")
+    counts["companies"] = len(comp)
+
+    pl = gen_profitandloss()
+    _write_core(pl, raw_root / "profitandloss.xlsx", "Profit & Loss")
+    counts["profitandloss"] = len(pl)
+
+    bs = gen_balancesheet(pl)
+    _write_core(bs, raw_root / "balancesheet.xlsx", "Balance Sheet")
+    counts["balancesheet"] = len(bs)
+
+    cf = gen_cashflow(pl, bs)
+    _write_core(cf, raw_root / "cashflow.xlsx", "Cash Flow")
+    counts["cashflow"] = len(cf)
+
+    an = gen_analysis()
+    _write_core(an, raw_root / "analysis.xlsx", "Analysis")
+    counts["analysis"] = len(an)
+
+    doc = gen_documents()
+    _write_core(doc, raw_root / "documents.xlsx", "Documents")
+    counts["documents"] = len(doc)
+
+    pc = gen_prosandcons()
+    _write_core(pc, raw_root / "prosandcons.xlsx", "Pros & Cons")
+    counts["prosandcons"] = len(pc)
+
+    sec = gen_sectors()
+    _write_supp(sec, sup_root / "sectors.xlsx")
+    counts["sectors"] = len(sec)
+
+    sp = gen_stock_prices()
+    _write_supp(sp, sup_root / "stock_prices.xlsx")
+    counts["stock_prices"] = len(sp)
+
+    mc = gen_market_cap()
+    _write_supp(mc, sup_root / "market_cap.xlsx")
+    counts["market_cap"] = len(mc)
+
+    fr = gen_financial_ratios(pl, bs, cf)
+    _write_supp(fr, sup_root / "financial_ratios.xlsx")
+    counts["financial_ratios"] = len(fr)
+
+    pg = gen_peer_groups()
+    _write_supp(pg, sup_root / "peer_groups.xlsx")
+    counts["peer_groups"] = len(pg)
+
+    return counts
+
+
 def main() -> None:
     print("Generating companies ...")
-    comp = gen_companies()
-    _write_core(comp, RAW_DIR / "companies.xlsx", "Companies")
-    print(f"  companies: {len(comp)} rows")
-
-    print("Generating profit & loss ...")
-    pl = gen_profitandloss()
-    _write_core(pl, RAW_DIR / "profitandloss.xlsx", "Profit & Loss")
-    print(f"  profitandloss: {len(pl)} rows")
-
-    print("Generating balance sheet ...")
-    bs = gen_balancesheet(pl)
-    _write_core(bs, RAW_DIR / "balancesheet.xlsx", "Balance Sheet")
-    print(f"  balancesheet: {len(bs)} rows")
-
-    print("Generating cash flow ...")
-    cf = gen_cashflow(pl, bs)
-    _write_core(cf, RAW_DIR / "cashflow.xlsx", "Cash Flow")
-    print(f"  cashflow: {len(cf)} rows")
-
-    print("Generating analysis ...")
-    an = gen_analysis()
-    _write_core(an, RAW_DIR / "analysis.xlsx", "Analysis")
-    print(f"  analysis: {len(an)} rows")
-
-    print("Generating documents ...")
-    doc = gen_documents()
-    _write_core(doc, RAW_DIR / "documents.xlsx", "Documents")
-    print(f"  documents: {len(doc)} rows")
-
-    print("Generating pros & cons ...")
-    pc = gen_prosandcons()
-    _write_core(pc, RAW_DIR / "prosandcons.xlsx", "Pros & Cons")
-    print(f"  prosandcons: {len(pc)} rows")
-
-    print("Generating sectors (supplementary) ...")
-    sec = gen_sectors()
-    _write_supp(sec, SUP_DIR / "sectors.xlsx")
-    print(f"  sectors: {len(sec)} rows")
-
-    print("Generating stock prices (supplementary) ...")
-    sp = gen_stock_prices()
-    _write_supp(sp, SUP_DIR / "stock_prices.xlsx")
-    print(f"  stock_prices: {len(sp)} rows")
-
-    print("Generating market cap (supplementary) ...")
-    mc = gen_market_cap()
-    _write_supp(mc, SUP_DIR / "market_cap.xlsx")
-    print(f"  market_cap: {len(mc)} rows")
-
-    print("Generating financial ratios (supplementary) ...")
-    fr = gen_financial_ratios(pl, bs, cf)
-    _write_supp(fr, SUP_DIR / "financial_ratios.xlsx")
-    print(f"  financial_ratios: {len(fr)} rows")
-
-    print("Generating peer groups (supplementary) ...")
-    pg = gen_peer_groups()
-    _write_supp(pg, SUP_DIR / "peer_groups.xlsx")
-    print(f"  peer_groups: {len(pg)} rows")
-
+    counts = generate_all(RAW_DIR)
+    for name, n in counts.items():
+        print(f"  {name}: {n} rows")
     print("\nDone. Files written to:", RAW_DIR)
 
 

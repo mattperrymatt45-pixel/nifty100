@@ -37,3 +37,28 @@ def test_dq06_zero_sales() -> None:
     assert len(failures) == 1
     assert failures[0].rule_id == "DQ-06"
     assert failures[0].severity == "WARNING"
+
+
+def test_dq06_bank_zero_sales_excluded() -> None:
+    """Banks/NBFCs (financial sector) are NOT flagged for zero sales."""
+    pl = pd.DataFrame({"company_id": ["HDFCBANK"], "year": ["2023-03"], "sales": [0.0]})
+    sectors = pd.DataFrame({"company_id": ["HDFCBANK"], "broad_sector": ["Private Banks"]})
+    failures = dq06_positive_sales({"profitandloss": pl, "sectors": sectors})
+    assert failures == []
+
+
+def test_dq06_nbfc_zero_sales_excluded() -> None:
+    """NBFCs (Finance sector) are NOT flagged for zero sales."""
+    pl = pd.DataFrame({"company_id": ["BAJFINANCE"], "year": ["2023-03"], "sales": [0.0]})
+    sectors = pd.DataFrame({"company_id": ["BAJFINANCE"], "broad_sector": ["Consumer Finance"]})
+    failures = dq06_positive_sales({"profitandloss": pl, "sectors": sectors})
+    assert failures == []
+
+
+def test_dq06_non_bank_zero_sales_flagged_even_with_sectors() -> None:
+    """Non-bank with zero sales is still flagged when sectors are present."""
+    pl = pd.DataFrame({"company_id": ["TCS"], "year": ["2023-03"], "sales": [0.0]})
+    sectors = pd.DataFrame({"company_id": ["TCS"], "broad_sector": ["Information Technology"]})
+    failures = dq06_positive_sales({"profitandloss": pl, "sectors": sectors})
+    assert len(failures) == 1
+    assert failures[0].company_id == "TCS"

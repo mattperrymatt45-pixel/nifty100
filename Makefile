@@ -3,7 +3,7 @@
 # Common developer commands. Run `make help` to see all targets.
 # =============================================================================
 
-.PHONY: help install install-dev test lint format clean run-dashboard run-api load load-reset
+.PHONY: help install install-dev test lint format clean run-dashboard run-api load load-reset dq-review
 
 # Default target
 help:
@@ -20,6 +20,7 @@ help:
 	@echo "  make run-api        Launch the FastAPI server with Uvicorn"
 	@echo "  make load           Run ETL pipeline (idempotent)"
 	@echo "  make load-reset     Fresh ETL run: truncate tables then load"
+	@echo "  make dq-review      Run DQ manual review report (5 random companies)"
 	@echo ""
 
 # ---- Dependency Installation ----
@@ -73,3 +74,6 @@ load:          ## Run the ETL pipeline (idempotent — appends, deduplicates on 
 
 load-reset:    ## Truncate all tables then run the ETL pipeline (fresh load)
 	python -m scripts.run_etl --reset
+
+dq-review:     ## Run the Day-6 DQ manual review (5 random companies deep-dive)
+	python -m scripts.dq_review

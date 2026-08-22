@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
-"""End-to-end ETL entry point (Sprint 1, Days 2-5).
+"""End-to-end ETL entry point (Sprint 1, Days 2-6).
 
 Loads all 12 datasets from ``data/raw/``, normalises tickers/years,
 initialises the SQLite database schema, bulk-loads all tables,
-runs DQ validation, and writes a load_audit trail (DB + CSV).
+rejects CRITICAL rows (unparseable years / invalid tickers) before
+insertion, runs DQ validation, and writes a full audit trail
+(load_audit.csv, validation_failures.csv, parse_failures.csv).
 
 Usage (from project root)::
 
@@ -41,11 +43,23 @@ from src.etl.database import (  # noqa: E402
     write_load_audit,
 )
 from src.etl.exceptions import ETLError, LoaderError  # noqa: E402
+from src.etl.normalizers import YEAR_PARSE_ERROR  # noqa: E402
 from src.etl.validation import validate_all  # noqa: E402
 from src.utils.config import settings  # noqa: E402
 from src.utils.logger import get_logger  # noqa: E402
 
 logger = get_logger(__name__)
+
+#: Tables whose ``year`` column is normalised to YYYY-MM and therefore
+#: must never contain the ``PARSE_ERROR`` sentinel when persisted.
+_YEAR_NORMALISED_TABLES: frozenset[str] = frozenset(
+    {"profitandloss", "balancesheet", "cashflow", "financial_ratios"}
+)
+
+#: Tables whose ticker column is ``company_id`` (everybody except companies
+#: itself, where the ticker lives in ``id``).
+_TICKER_COL: dict[str, str] = {"companies": "id"}
+_DEFAULT_TICKER_COL = "company_id"
 
 # Load order: parent/snapshot tables first, then time-series children.
 # companies is the only FK parent; dimensions are loaded before facts for
@@ -95,6 +109,70 @@ _POST_PROCESS: dict[str, callable] = {
 }
 
 
+def _reject_critical_rows(
+    df: pd.DataFrame, table_name: str, parse_failures: list[dict]
+) -> pd.DataFrame:
+    """Remove CRITICAL-DQ rows (unparseable years / tickers) before DB insert.
+
+    Rows whose year column equals the ``PARSE_ERROR`` sentinel are removed
+    and appended to ``parse_failures`` so they can be logged to
+    ``parse_failures.csv``. Rows whose ticker is empty/None after
+    normalisation are also removed (the loader already drops these for
+    ticker_col tables, but we re-check defensively).
+
+    Returns the cleaned DataFrame.
+    """
+    before = len(df)
+
+    # Reject PARSE_ERROR years in tables that receive normalised FY labels.
+    if table_name in _YEAR_NORMALISED_TABLES and "year" in df.columns:
+        bad_mask = df["year"].astype(str) == YEAR_PARSE_ERROR
+        if bad_mask.any():
+            for idx in df.index[bad_mask]:
+                parse_failures.append(
+                    {
+                        "table": table_name,
+                        "company_id": (
+                            str(df.at[idx, "company_id"]) if "company_id" in df.columns else None
+                        ),
+                        "column": "year",
+                        "raw_value": str(df.at[idx, "year"]),
+                        "reason": "Unparseable financial-year label (DQ-07)",
+                        "detected_at": datetime.now(UTC)
+                        .replace(tzinfo=None)
+                        .isoformat(timespec="seconds")
+                        + "Z",
+                    }
+                )
+            df = df.loc[~bad_mask].reset_index(drop=True)
+
+    # Reject rows with missing/empty ticker in the appropriate column.
+    tcol = _TICKER_COL.get(table_name, _DEFAULT_TICKER_COL)
+    if tcol in df.columns:
+        empty_mask = df[tcol].isna() | (df[tcol].astype(str).str.strip() == "")
+        if empty_mask.any():
+            for _idx in df.index[empty_mask]:
+                parse_failures.append(
+                    {
+                        "table": table_name,
+                        "company_id": None,
+                        "column": tcol,
+                        "raw_value": None,
+                        "reason": "Missing/invalid ticker (DQ-08)",
+                        "detected_at": datetime.now(UTC)
+                        .replace(tzinfo=None)
+                        .isoformat(timespec="seconds")
+                        + "Z",
+                    }
+                )
+            df = df.loc[~empty_mask].reset_index(drop=True)
+
+    rejected = before - len(df)
+    if rejected:
+        logger.warning(f"{table_name}: rejected {rejected} row(s) with CRITICAL DQ failures")
+    return df
+
+
 def run(
     *,
     reset: bool = False,
@@ -122,6 +200,7 @@ def run(
 
     tables: dict[str, pd.DataFrame] = {}
     audit_entries: list[dict] = []
+    parse_failures: list[dict] = []
 
     # 2. Load order: parent/snapshot tables first, then time-series children.
     ordered = [n for n in LOAD_ORDER if n in targets]
@@ -133,15 +212,25 @@ def run(
         try:
             df = load_dataset(name)
 
-            # Apply per-dataset post-processing
+            # Apply per-dataset post-processing (year type coercion etc.)
             hook = _POST_PROCESS.get(name)
             if hook is not None:
                 df = hook(df)
+
+            # Reject CRITICAL rows (PARSE_ERROR years, empty tickers) so
+            # they never reach SQLite, and log them to parse_failures.
+            rows_before_reject = len(df)
+            df = _reject_critical_rows(df, name, parse_failures)
+            critical_rejected = rows_before_reject - len(df)
 
             tables[name] = df
             stats = load_dataframe(df, name, deduplicate=True)
             stats["runtime_s"] = round(time.perf_counter() - t0, 3)
             stats["status"] = "OK"
+            # Translate loader keys to the load_audit schema names so the
+            # CSV/DB columns (rows_out, rows_rejected) are always populated.
+            stats["rows_out"] = stats.get("rows_loaded", 0)
+            stats["rows_rejected"] = stats.get("rows_dropped", 0) + critical_rejected
             audit_entries.append(stats)
         except ETLError as exc:
             logger.error(f"Failed to load {name}: {exc}")
@@ -151,6 +240,9 @@ def run(
                     "rows_in": 0,
                     "rows_loaded": 0,
                     "rows_dropped": 0,
+                    "rows_out": 0,
+                    "rows_rejected": 0,
+                    "rows_deleted": 0,
                     "runtime_s": round(time.perf_counter() - t0, 3),
                     "status": f"FAILED: {exc}",
                 }
@@ -200,18 +292,36 @@ def run(
         entry["rows_out"] = table_rowcount(entry["table"])
     write_load_audit(audit_entries)
 
-    # 5. Export load_audit table to CSV (Day 5 deliverable) alongside
-    #    validation_failures.csv so analysts have a single-folder audit trail.
-    audit_csv = settings.PROCESSED_DATA_DIR / "load_audit.csv"
+    # 5. Export audit CSVs to PROCESSED_DATA_DIR so analysts have a
+    #    single-folder audit trail.
+    processed = settings.PROCESSED_DATA_DIR
+    processed.mkdir(parents=True, exist_ok=True)
+
+    # 5a. load_audit.csv (every load appended; we export the latest run)
+    audit_csv = processed / "load_audit.csv"
     with get_connection() as conn:
         audit_df = pd.read_sql_query("SELECT * FROM load_audit ORDER BY id DESC LIMIT 1000", conn)
     audit_df.to_csv(audit_csv, index=False)
     logger.info(f"Wrote load_audit CSV: {audit_csv} ({len(audit_df)} rows)")
 
+    # 5b. parse_failures.csv — rows rejected before DB insert (DQ-07 / DQ-08)
+    parse_csv = processed / "parse_failures.csv"
+    if parse_failures:
+        pf_df = pd.DataFrame(parse_failures)
+        pf_df.to_csv(parse_csv, index=False)
+        logger.info(f"Wrote parse_failures CSV: {parse_csv} ({len(pf_df)} rejected rows)")
+    else:
+        pd.DataFrame(
+            columns=["table", "company_id", "column", "raw_value", "reason", "detected_at"]
+        ).to_csv(parse_csv, index=False)
+        logger.info(f"No parse failures. Empty report written to {parse_csv}")
+
     total_runtime = round(time.perf_counter() - start, 3)
+    total_loaded = sum(e.get("rows_loaded", 0) for e in audit_entries)
+    total_rejected = sum(e.get("rows_rejected", 0) for e in audit_entries)
     logger.info(
         f"=== ETL run complete in {total_runtime}s — "
-        f"{sum(e.get('rows_loaded', 0) for e in audit_entries)} rows across "
+        f"{total_loaded} rows loaded / {total_rejected} rejected across "
         f"{len(audit_entries)} tables ==="
     )
 
@@ -221,7 +331,7 @@ def run(
         print(
             f"  {e['table']:<18} in={e.get('rows_in',0):>6}  "
             f"loaded={e.get('rows_loaded',0):>6}  "
-            f"dropped={e.get('rows_dropped',0):>4}  "
+            f"rejected={e.get('rows_rejected',0):>4}  "
             f"[{e['status']}] ({e.get('runtime_s',0):.2f}s)"
         )
     print(
@@ -231,10 +341,12 @@ def run(
     print(f"DB: {settings.DB_PATH}")
     print(f"Validation CSV: {vf_path}")
     print(f"Load audit CSV: {audit_csv}")
+    print(f"Parse failures CSV: {parse_csv}")
 
     return {
         "audit": audit_entries,
         "dq": summary,
+        "parse_failures": parse_failures,
         "runtime_s": total_runtime,
     }
 

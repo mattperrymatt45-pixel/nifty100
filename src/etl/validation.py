@@ -330,30 +330,53 @@ def dq05_opm_crosscheck(tables: TableBundle) -> list[DQFailure]:
 
 # ---------------------------------------------------------------------------
 # DQ-06: Positive sales (WARNING) -- sales > 0 for non-bank companies.
-# We don't have sector map yet (Day 2 scope), so flag *all* sales ≤ 0 as
-# warnings; the sector carve-out can be tightened in a later iteration.
+# Banks / NBFCs (financial-sector companies) are excluded because their
+# revenue is reported as interest income rather than "sales", so a zero
+# or missing sales column is expected.
 # ---------------------------------------------------------------------------
+# Sectors considered to be financial firms whose revenue is not "sales".
+_FINANCIAL_SECTOR_KEYWORDS: tuple[str, ...] = ("bank", "nbfc", "finance", "financial")
+
+
 @register_rule("DQ-06")
 def dq06_positive_sales(tables: TableBundle) -> list[DQFailure]:
     failures: list[DQFailure] = []
     df = tables.get("profitandloss")
     if df is None or not _has(df, "sales"):
         return failures
+
+    # Build a set of financial-sector company_ids from the sectors table
+    # if it has been loaded; otherwise fall back to flagging every non-
+    # positive row (matches the Day-2 behaviour before sector carve-out).
+    financial_ids: set[str] = set()
+    sectors = tables.get("sectors")
+    if sectors is not None and _has(sectors, "company_id") and _has(sectors, "broad_sector"):
+        for _idx, srow in sectors.iterrows():
+            sector_name = str(srow.get("broad_sector", "") or "").lower()
+            if any(kw in sector_name for kw in _FINANCIAL_SECTOR_KEYWORDS):
+                cid = srow["company_id"]
+                if not pd.isna(cid):
+                    financial_ids.add(str(cid))
+
     sales = _coerce_numeric(df["sales"])
     bad = sales <= 0
     for idx in df.index[bad.fillna(False)]:
         cid = df.at[idx, "company_id"] if _has(df, "company_id") else None
+        cid_str = None if pd.isna(cid) else str(cid)
+        # Skip companies in the financial sector
+        if cid_str in financial_ids:
+            continue
         yr = df.at[idx, "year"] if _has(df, "year") else None
         failures.append(
             DQFailure(
                 rule_id="DQ-06",
                 table="profitandloss",
                 severity="WARNING",
-                message="Sales non-positive",
-                company_id=None if pd.isna(cid) else str(cid),
+                message="Sales non-positive for non-bank company",
+                company_id=cid_str,
                 year=None if pd.isna(yr) else str(yr),
                 column="sales",
-                expected="sales > 0",
+                expected="sales > 0 (non-bank companies)",
                 actual=float(sales.at[idx]),
                 row_index=int(idx),
             )
