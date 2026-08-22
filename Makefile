@@ -3,7 +3,7 @@
 # Common developer commands. Run `make help` to see all targets.
 # =============================================================================
 
-.PHONY: help install install-dev test lint format clean run-dashboard run-api load load-reset dq-review
+.PHONY: help install install-dev test lint format clean run-dashboard run-api load load-reset dq-review demo
 
 # Default target
 help:
@@ -21,6 +21,7 @@ help:
 	@echo "  make load           Run ETL pipeline (idempotent)"
 	@echo "  make load-reset     Fresh ETL run: truncate tables then load"
 	@echo "  make dq-review      Run DQ manual review report (5 random companies)"
+	@echo "  make demo           Sprint 1 DB demo (table counts, sectors, top companies)"
 	@echo ""
 
 # ---- Dependency Installation ----
@@ -77,3 +78,6 @@ load-reset:    ## Truncate all tables then run the ETL pipeline (fresh load)
 
 dq-review:     ## Run the Day-6 DQ manual review (5 random companies deep-dive)
 	python -m scripts.dq_review
+
+demo:          ## Sprint 1 DB demo — print table stats, sector mix, top companies, audit
+	python -m scripts.demo_db

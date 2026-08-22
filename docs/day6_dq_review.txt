@@ -1,0 +1,68 @@
+==============================================================================
+NIFTY 100 — DATA QUALITY MANUAL REVIEW
+Seed=12345  DB=/home/user/nifty100/db/nifty100.db
+==============================================================================
+
+Companies loaded: 92
+FK orphans: NONE
+PARSE_ERROR rows in DB: NONE
+
+--- Coverage (DQ-16: ≥5 years per core table) ---
+OK — all 92 companies have ≥5 years of P&L, BS, and CF.
+
+--- Year-count distribution (P&L) ---
+   12 years:  15 companies
+   13 years:  14 companies
+   14 years:  45 companies
+   15 years:  18 companies
+
+--- 5 Random Companies Deep-Dive ---
+
+▸ KOTAKBANK  —  Kotak Mahindra Bank Ltd  (Financials)
+    P&L                       :    14 years  2011-03 → 2024-03
+    BS                        :    14 years  2011-03 → 2024-03
+    CF                        :    13 years  2011-03 → 2024-03
+    Ratios                    :    14 years  2011-03 → 2024-03
+    Docs (calendar ints)      :    17 years  2008 → 2025
+    Mkt Cap (calendar ints)   :     6 years  2019 → 2024
+    Prices (months)           :    60 rows  2020-01-01 → 2024-12-01
+
+▸ ADANIGREEN  —  Adani Green Energy Ltd  (Energy)
+    P&L                       :    14 years  2011-03 → 2024-03
+    BS                        :    14 years  2011-03 → 2024-03
+    CF                        :    14 years  2011-03 → 2024-03
+    Ratios                    :    14 years  2011-03 → 2024-03
+    Docs (calendar ints)      :    18 years  2008 → 2025
+    Mkt Cap (calendar ints)   :     6 years  2019 → 2024
+    Prices (months)           :    60 rows  2020-01-01 → 2024-12-01
+
+▸ HEROMOTOCO  —  Hero MotoCorp Ltd  (Consumer Discretionary)
+    P&L                       :    12 years  2013-03 → 2024-03
+    BS                        :    13 years  2011-03 → 2024-03
+    CF                        :    11 years  2013-03 → 2024-03
+    Ratios                    :    10 years  2013-03 → 2024-03
+    Docs (calendar ints)      :    16 years  2008 → 2024
+    Mkt Cap (calendar ints)   :     6 years  2019 → 2024
+    Prices (months)           :    60 rows  2020-01-01 → 2024-12-01
+
+▸ IOC  —  Indian Oil Corporation Ltd  (Energy)
+    P&L                       :    14 years  2011-03 → 2024-03
+    BS                        :    14 years  2011-03 → 2024-03
+    CF                        :    12 years  2011-03 → 2024-03
+    Ratios                    :    13 years  2011-03 → 2024-03
+    Docs (calendar ints)      :    18 years  2008 → 2025
+    Mkt Cap (calendar ints)   :     6 years  2019 → 2024
+    Prices (months)           :    60 rows  2020-01-01 → 2024-12-01
+
+▸ COLPAL  —  Colgate Palmolive (India) Ltd  (Consumer Staples)
+    P&L                       :    14 years  2011-03 → 2024-03
+    BS                        :    14 years  2011-03 → 2024-03
+    CF                        :    13 years  2012-03 → 2024-03
+    Ratios                    :    14 years  2011-03 → 2024-03
+    Docs (calendar ints)      :    17 years  2008 → 2025
+    Mkt Cap (calendar ints)   :     6 years  2019 → 2024
+    Prices (months)           :    60 rows  2020-01-01 → 2024-12-01
+
+==============================================================================
+VERDICT: CLEAN — 0 CRITICAL, 0 coverage warnings (none).
+==============================================================================
