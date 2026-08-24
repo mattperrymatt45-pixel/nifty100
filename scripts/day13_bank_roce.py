@@ -12,6 +12,7 @@ Usage:
 
 from __future__ import annotations
 
+import argparse
 import sys
 from pathlib import Path
 
@@ -34,13 +35,21 @@ from src.utils.logger import get_logger  # noqa: E402
 logger = get_logger(__name__)
 
 
-def run_bank_carveout() -> tuple[int, str]:
-    """Apply bank ROCE carve-out, run cross-check, write log. Return (n_anomalies, log_text)."""
-    init_schema()
+def run_bank_carveout(
+    db_path: Path | str | None = None,
+    log_path: Path | str | None = None,
+) -> tuple[int, str]:
+    """Apply bank ROCE carve-out, run cross-check, write log. Return (n_anomalies, log_text).
+
+    Args:
+        db_path: Override DB path (defaults to settings.DB_PATH).
+        log_path: Override log output path (defaults to output/ratio_edge_cases.log).
+    """
+    init_schema(db_path)
     all_anomalies = []
     updates: list[dict] = []
 
-    with get_connection() as conn:
+    with get_connection(db_path) as conn:
         # Pull latest-year financial_ratios joined to companies + sectors
         sql = """
             SELECT
@@ -137,18 +146,23 @@ def run_bank_carveout() -> tuple[int, str]:
 
     log_text = format_anomaly_log(all_anomalies)
 
-    # Write log to output/
-    out_dir = settings.OUTPUT_DIR
-    out_dir.mkdir(parents=True, exist_ok=True)
-    log_path = out_dir / "ratio_edge_cases.log"
-    log_path.write_text(log_text + "\n", encoding="utf-8")
-    logger.info(f"Wrote ratio edge-case log to {log_path} ({len(all_anomalies)} anomalies)")
+    # Write log to output/ (default) or a caller-supplied path (e.g. tests)
+    target_log = Path(log_path) if log_path else (settings.OUTPUT_DIR / "ratio_edge_cases.log")
+    target_log.parent.mkdir(parents=True, exist_ok=True)
+    target_log.write_text(log_text + "\n", encoding="utf-8")
+    logger.info(f"Wrote ratio edge-case log to {target_log} ({len(all_anomalies)} anomalies)")
     return len(all_anomalies), log_text
 
 
 def main() -> int:
-    n, _ = run_bank_carveout()
-    print(f"Day 13 complete: {n} anomalies logged to output/ratio_edge_cases.log")
+    parser = argparse.ArgumentParser(description="Day 13 bank ROCE carve-out")
+    parser.add_argument("--db-path", type=Path, default=None, help="Override DB path")
+    parser.add_argument("--log-path", type=Path, default=None, help="Override log output path")
+    args = parser.parse_args()
+    n, _ = run_bank_carveout(db_path=args.db_path, log_path=args.log_path)
+    print(
+        f"Day 13 complete: {n} anomalies logged to {args.log_path or 'output/ratio_edge_cases.log'}"
+    )
     return 0
 
 

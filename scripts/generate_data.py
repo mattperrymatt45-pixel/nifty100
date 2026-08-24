@@ -426,11 +426,22 @@ def gen_balancesheet(pl_df: pd.DataFrame) -> pd.DataFrame:
         sector = info[2]
         asset_mult = 1.8 if sector != "Financials" else 0.4
         total_assets = sales * asset_mult * random.uniform(0.8, 1.3)
-        # equity side
+        # equity side: target ROE ~12-30% (non-banks) or ~12-20% (banks) so
+        # that screener filters produce realistic company counts.
         equity_cap = random.choice([5, 10, 20, 50, 100, 200, 500])
-        # Build reserves ~ cumulative profits
-        fy_idx = FY_LABELS.index(fy) if fy in FY_LABELS else 10
-        reserves = max(np_ * (fy_idx + 1) * random.uniform(3, 7), equity_cap * 5)
+        if sector == "Financials":
+            target_roe = random.uniform(0.12, 0.20)
+        elif sector == "IT":
+            target_roe = random.uniform(0.22, 0.40)
+        elif sector in ("Consumer Staples", "Healthcare"):
+            target_roe = random.uniform(0.18, 0.35)
+        else:
+            target_roe = random.uniform(0.12, 0.25)
+        # Book equity needed to hit target ROE; reserves is the plug after
+        # subtracting paid-in capital. Floor reserves at equity_cap*2 to avoid
+        # tiny/negative reserves when a single-year PAT dips.
+        target_equity = max(np_ / target_roe if np_ > 0 else equity_cap * 5, sales * 0.2)
+        reserves = max(target_equity - equity_cap, equity_cap * 2)
         # Liabilities
         is_bank = sector == "Financials"
         if is_bank:

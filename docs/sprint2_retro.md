@@ -72,7 +72,7 @@ From spec §29 Week 2 Go/No-Go:
 | Formula spot-checks match hand-computed values (3 companies × ROE + 5yr CAGR) | ✅ NAUKRI / COALINDIA / SIEMENS all deltas = 0.000000 pp |
 | Bank / NBFC D/E high-leverage flag **suppressed** (structural leverage) | ✅ 18 financial-sector companies correctly skip `high_leverage_flag` |
 | Bank/NBFC/Insurance ROCE uses ROA-proxy (EBIT/Total Assets) | ✅ `is_bank_nfc_insurance()` matches 18 tickers across banks, NBFCs, insurance |
-| Cross-check vs `companies.roce_percentage` / `roe_percentage` logged | ✅ `output/ratio_edge_cases.log` with 2,009 anomalies across 4 categories |
+| Cross-check vs `companies.roce_percentage` / `roe_percentage` logged | ✅ `output/ratio_edge_cases.log` with 1,669 anomalies across 4 categories |
 | Capital-allocation classification CSV produced | ✅ `output/capital_allocation.csv` (1,182 rows, 8 patterns) |
 | Composite quality score 0–100 populated for all rows | ✅ Winsorised (P10/P90), 4-component weighted, 1,182/1,182 rows |
 | `make load` + `make populate-ratios` + `make bank-roce` idempotent | ✅ Re-runs produce identical row counts and spot-check deltas |

@@ -290,6 +290,7 @@ class TestRunBankCarveoutNoClobber:
         from src.etl.database import init_schema
 
         db_path = tmp_path / "test.db"
+        log_path = tmp_path / "ratio_edge_cases.log"
         monkeypatch.setenv("NIFTY100_DB_PATH", str(db_path))
 
         # Build a minimal schema with the columns we need.
@@ -372,8 +373,11 @@ class TestRunBankCarveoutNoClobber:
             conn.commit()
 
         # Run the Day-13 carve-out.
-        n_anomalies, _ = run_bank_carveout()
+        n_anomalies, _ = run_bank_carveout(db_path=str(db_path), log_path=str(log_path))
         assert n_anomalies >= 1
+        # The log should have been written to our tmp path, NOT to settings.OUTPUT_DIR.
+        assert log_path.exists()
+        assert "TCS" in log_path.read_text()
 
         # Verify Day-13 columns populated AND existing columns were NOT wiped.
         with sqlite3.connect(db_path) as conn:
