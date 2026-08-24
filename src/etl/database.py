@@ -117,17 +117,46 @@ def _schema_path() -> Path:
     return candidate
 
 
+def _migrate_schema(conn: sqlite3.Connection) -> None:
+    """Idempotently add any columns introduced after initial launch.
+
+    SQLite does not support ``ALTER TABLE ADD COLUMN IF NOT EXISTS`` in older
+    versions; we introspect ``PRAGMA table_info`` and only ADD what is missing.
+    Add new columns here as the schema evolves during Sprint 2+.
+    """
+    migrations: dict[str, list[tuple[str, str]]] = {
+        "financial_ratios": [
+            ("ebit_margin_pct", "REAL"),
+            ("return_on_assets_pct", "REAL"),
+            ("high_leverage_flag", "INTEGER NOT NULL DEFAULT 0"),
+            ("icr_label", "TEXT"),
+            ("icr_warning_flag", "INTEGER NOT NULL DEFAULT 0"),
+            ("net_debt_cr", "REAL"),
+        ],
+    }
+    for table, cols in migrations.items():
+        cur = conn.execute(f"PRAGMA table_info({table})")
+        existing = {row[1] for row in cur.fetchall()}
+        for col_name, col_def in cols:
+            if col_name not in existing:
+                conn.execute(f"ALTER TABLE {table} ADD COLUMN {col_name} {col_def}")
+                logger.info(f"Migration: added column {table}.{col_name}")
+
+
 def init_schema(db_path: Path | str | None = None) -> None:
     """Execute db/schema.sql to create all tables, indexes, and triggers.
 
     Safe to call multiple times (uses ``IF NOT EXISTS``).  Pass
-    ``db_path=':memory:'`` for an ephemeral test database.
+    ``db_path=':memory:'`` for an ephemeral test database.  Runs lightweight
+    idempotent migrations after the schema script to backfill new columns
+    added to existing databases.
     """
     schema_file = _schema_path()
     sql = schema_file.read_text(encoding="utf-8")
     resolved = _resolve_db_path(db_path)
     with get_connection(resolved) as conn:
         conn.executescript(sql)
+        _migrate_schema(conn)
     logger.info(f"Schema initialized from {schema_file}")
 
 

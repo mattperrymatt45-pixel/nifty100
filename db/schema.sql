@@ -188,10 +188,16 @@ CREATE TABLE IF NOT EXISTS financial_ratios (
     year                     TEXT    NOT NULL,
     net_profit_margin_pct    REAL,
     operating_profit_margin_pct REAL,
+    ebit_margin_pct          REAL,
     return_on_equity_pct     REAL,
     roce_pct                 REAL,
+    return_on_assets_pct     REAL,
     debt_to_equity           REAL,
+    high_leverage_flag       INTEGER NOT NULL DEFAULT 0,  -- 1 if D/E > 5 (non-financial)
     interest_coverage        REAL,
+    icr_label                TEXT,                           -- "Debt Free" when interest=0
+    icr_warning_flag         INTEGER NOT NULL DEFAULT 0,  -- 1 if 0<ICR<1.5
+    net_debt_cr              REAL,                           -- borrowings - investments (₹Cr)
     asset_turnover           REAL,
     free_cash_flow_cr        REAL,
     capex_cr                 REAL,
