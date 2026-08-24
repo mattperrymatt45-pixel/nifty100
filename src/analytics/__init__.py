@@ -1,10 +1,10 @@
-"""Nifty 100 Financial Intelligence Platform — Analytics Package.
+"""Nifty 100 Financial Intelligence Platform - Analytics Package.
 
 Modules:
-    ratios         — Profitability ratio primitives (Sprint 2, Day 08).
-    leverage       — Leverage & efficiency ratios (Sprint 2, Day 09).
-    cagr           — CAGR growth engine (Sprint 2, Day 10).
-    cashflow_kpis  — Cash-flow quality KPIs (Sprint 2, Day 11).
+    ratios         - Profitability ratio primitives (Sprint 2, Day 08).
+    leverage       - Leverage & efficiency ratios (Sprint 2, Day 09).
+    cagr           - CAGR growth engine (Sprint 2, Day 10).
+    cashflow_kpis  - Cash-flow quality + capital allocation (Sprint 2, Day 11).
 """
 
 from src.analytics.cagr import (
@@ -20,6 +20,34 @@ from src.analytics.cagr import (
     cagr,
     compute_all_cagrs,
     compute_cagrs_for_series,
+)
+from src.analytics.cashflow_kpis import (
+    CAPEX_LIGHT_MAX,
+    CAPEX_MODERATE_MAX,
+    CAPITAL_ALLOCATION_CSV_COLUMNS,
+    CFO_QUALITY_HIGH,
+    CFO_QUALITY_MODERATE_LOW,
+    FCF_CONCERN_CONSEC_YEARS,
+    PATTERN_CASH_ACCUMULATOR,
+    PATTERN_DISTRESS_SIGNAL,
+    PATTERN_GROWTH_FUNDED_BY_DEBT,
+    PATTERN_LIQUIDATING_ASSETS,
+    PATTERN_MIXED,
+    PATTERN_PRE_REVENUE,
+    PATTERN_REINVESTOR,
+    PATTERN_SHAREHOLDER_RETURNS,
+    CapitalAllocationRow,
+    CashFlowKPIs,
+    build_capital_allocation_rows,
+    capex_intensity,
+    capex_tier,
+    cfo_pat_ratio,
+    cfo_quality_tier,
+    classify_capital_allocation,
+    compute_cashflow_kpis_for_company,
+    fcf_conversion,
+    free_cash_flow,
+    write_capital_allocation_csv,
 )
 from src.analytics.leverage import (
     HIGH_LEVERAGE_DE_THRESHOLD,
@@ -57,25 +85,50 @@ __all__ = [
     "CAGR_OK",
     "CAGR_TURNAROUND",
     "CAGR_WINDOWS",
+    "CAPEX_LIGHT_MAX",
+    "CAPEX_MODERATE_MAX",
+    "CAPITAL_ALLOCATION_CSV_COLUMNS",
+    "CFO_QUALITY_HIGH",
+    "CFO_QUALITY_MODERATE_LOW",
+    "FCF_CONCERN_CONSEC_YEARS",
     "FINANCIAL_SECTOR_KEYWORDS",
     "HIGH_LEVERAGE_DE_THRESHOLD",
     "ICR_DEBT_FREE_LABEL",
     "ICR_WARNING_THRESHOLD",
     "OPM_CROSSCHECK_TOLERANCE",
+    "PATTERN_CASH_ACCUMULATOR",
+    "PATTERN_DISTRESS_SIGNAL",
+    "PATTERN_GROWTH_FUNDED_BY_DEBT",
+    "PATTERN_LIQUIDATING_ASSETS",
+    "PATTERN_MIXED",
+    "PATTERN_PRE_REVENUE",
+    "PATTERN_REINVESTOR",
+    "PATTERN_SHAREHOLDER_RETURNS",
     "VALID_FLAGS",
     "CAGRResult",
+    "CapitalAllocationRow",
+    "CashFlowKPIs",
     "CompanyCAGRs",
     "LeverageRatios",
     "ProfitabilityRatios",
     "asset_turnover",
+    "build_capital_allocation_rows",
     "cagr",
+    "capex_intensity",
+    "capex_tier",
+    "cfo_pat_ratio",
+    "cfo_quality_tier",
+    "classify_capital_allocation",
     "compute_all_cagrs",
     "compute_cagrs_for_series",
+    "compute_cashflow_kpis_for_company",
     "compute_leverage_ratios",
     "compute_profitability_ratios",
     "debt_to_equity",
     "ebit",
     "ebit_margin",
+    "fcf_conversion",
+    "free_cash_flow",
     "high_leverage_flag",
     "icr_display_label",
     "icr_warning_flag",
@@ -87,4 +140,5 @@ __all__ = [
     "return_on_assets",
     "return_on_capital_employed",
     "return_on_equity",
+    "write_capital_allocation_csv",
 ]

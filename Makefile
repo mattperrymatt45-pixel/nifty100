@@ -81,3 +81,6 @@ dq-review:     ## Run the Day-6 DQ manual review (5 random companies deep-dive)
 
 demo:          ## Sprint 1 DB demo — print table stats, sector mix, top companies, audit
 	python -m scripts.demo_db
+
+capital-alloc: ## Generate output/capital_allocation.csv (Sprint 2 Day 11)
+	python -m scripts.generate_capital_allocation_csv

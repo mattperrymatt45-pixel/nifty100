@@ -225,6 +225,19 @@ CREATE TABLE IF NOT EXISTS financial_ratios (
     eps_cagr_5yr_flag        TEXT,
     eps_cagr_10yr            REAL,
     eps_cagr_10yr_flag       TEXT,
+    -- Cash-flow KPI columns (Sprint 2 Day 11)
+    fcf_cr                   REAL,
+    cfo_pat_ratio            REAL,
+    cfo_quality_score_5yr    REAL,
+    cfo_quality_tier         TEXT,
+    capex_intensity_pct      REAL,
+    capex_tier               TEXT,
+    fcf_conversion_pct       REAL,
+    capital_allocation_pattern TEXT,
+    cfo_sign                 TEXT,
+    cfi_sign                 TEXT,
+    cff_sign                 TEXT,
+    fcf_concern_flag         INTEGER NOT NULL DEFAULT 0,
     PRIMARY KEY (company_id, year),
     FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
 );
