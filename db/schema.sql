@@ -239,6 +239,12 @@ CREATE TABLE IF NOT EXISTS financial_ratios (
     cff_sign                 TEXT,
     fcf_concern_flag         INTEGER NOT NULL DEFAULT 0,
     composite_quality_score  REAL,                           -- 0-100, P10/P90 winsorised
+    -- Day 13: Bank ROCE carve-out and cross-check metadata
+    roce_sector_adjusted     REAL,                           -- ROA-proxy for banks/NBFC/insurance; NULL otherwise
+    roce_source_value        REAL,                           -- companies.roce_percentage (latest snapshot, display only)
+    roe_source_value         REAL,                           -- companies.roe_percentage (display only)
+    roce_anomaly_category    TEXT,                           -- bank_carveout / formula_discrepancy / version_difference / data_source
+    roe_anomaly_category     TEXT,
     PRIMARY KEY (company_id, year),
     FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
 );

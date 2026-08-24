@@ -3,7 +3,7 @@
 # Common developer commands. Run `make help` to see all targets.
 # =============================================================================
 
-.PHONY: help install install-dev test lint format clean run-dashboard run-api load load-reset dq-review demo
+.PHONY: help install install-dev test lint format clean run-dashboard run-api load load-reset dq-review demo capital-alloc populate-ratios bank-roce
 
 # Default target
 help:
@@ -87,3 +87,6 @@ capital-alloc: ## Generate output/capital_allocation.csv (Sprint 2 Day 11)
 
 populate-ratios: ## Populate financial_ratios table with all computed KPIs (Sprint 2 Day 12)
 	python -m scripts.populate_ratios --reset --spot-check
+
+bank-roce: ## Run Day 13 bank ROCE carve-out and write output/ratio_edge_cases.log
+	python -m scripts.day13_bank_roce
