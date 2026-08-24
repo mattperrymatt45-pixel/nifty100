@@ -84,3 +84,6 @@ demo:          ## Sprint 1 DB demo — print table stats, sector mix, top compan
 
 capital-alloc: ## Generate output/capital_allocation.csv (Sprint 2 Day 11)
 	python -m scripts.generate_capital_allocation_csv
+
+populate-ratios: ## Populate financial_ratios table with all computed KPIs (Sprint 2 Day 12)
+	python -m scripts.populate_ratios --reset --spot-check

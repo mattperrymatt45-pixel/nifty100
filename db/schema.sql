@@ -238,6 +238,7 @@ CREATE TABLE IF NOT EXISTS financial_ratios (
     cfi_sign                 TEXT,
     cff_sign                 TEXT,
     fcf_concern_flag         INTEGER NOT NULL DEFAULT 0,
+    composite_quality_score  REAL,                           -- 0-100, P10/P90 winsorised
     PRIMARY KEY (company_id, year),
     FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
 );

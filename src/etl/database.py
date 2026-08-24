@@ -164,6 +164,8 @@ def _migrate_schema(conn: sqlite3.Connection) -> None:
             ("cfi_sign", "TEXT"),
             ("cff_sign", "TEXT"),
             ("fcf_concern_flag", "INTEGER NOT NULL DEFAULT 0"),
+            # Day 12: full ratio population + composite score
+            ("composite_quality_score", "REAL"),
         ],
     }
     for table, cols in migrations.items():
