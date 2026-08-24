@@ -27,7 +27,7 @@ from src.analytics.sector_roce import (  # noqa: E402
     format_anomaly_log,
     is_bank_nfc_insurance,
 )
-from src.etl.database import get_connection, init_schema, load_dataframe  # noqa: E402
+from src.etl.database import get_connection, init_schema  # noqa: E402
 from src.utils.config import settings  # noqa: E402
 from src.utils.logger import get_logger  # noqa: E402
 
@@ -105,10 +105,35 @@ def run_bank_carveout() -> tuple[int, str]:
             }
         )
 
-    # Write updates back via idempotent merge (only Day-13 columns change)
-    upd_df = pd.DataFrame(updates)
-    stats = load_dataframe(upd_df, "financial_ratios", merge=True)
-    logger.info(f"Updated {stats['rows_loaded']} rows with Day-13 carve-out metadata")
+    # Write updates via in-place UPDATE (load_dataframe with merge=True does a
+    # DELETE+INSERT which would null out every other column — unsafe for partial
+    # column updates).
+    with get_connection() as conn:
+        conn.executemany(
+            """
+            UPDATE financial_ratios
+               SET roce_sector_adjusted = ?,
+                   roce_source_value    = ?,
+                   roe_source_value     = ?,
+                   roce_anomaly_category = ?,
+                   roe_anomaly_category  = ?
+             WHERE company_id = ? AND year = ?
+            """,
+            [
+                (
+                    u["roce_sector_adjusted"],
+                    u["roce_source_value"],
+                    u["roe_source_value"],
+                    u["roce_anomaly_category"],
+                    u["roe_anomaly_category"],
+                    u["company_id"],
+                    u["year"],
+                )
+                for u in updates
+            ],
+        )
+        conn.commit()
+    logger.info(f"Updated {len(updates)} rows with Day-13 carve-out metadata")
 
     log_text = format_anomaly_log(all_anomalies)
 

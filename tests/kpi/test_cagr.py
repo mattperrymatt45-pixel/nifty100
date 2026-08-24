@@ -79,12 +79,16 @@ class TestNormalCAGR:
         assert r.value is not None
         assert r.value == pytest.approx(-10.0, rel=1e-4)
 
-    def test_spec_example(self) -> None:
-        """Spec page 41: base=100, end=161, n=5 → ≈10.0%."""
+    def test_cagr_normal(self) -> None:
+        """Spec §27 (page 41): base=100, end=161, n=5 → CAGR ≈ 10.0%.
+
+        (161/100)^(1/5) - 1 ≈ 9.99% — within 0.05pp of 10.0% since
+        1.10**5 = 161.051 exactly.
+        """
         r = cagr(100.0, 161.0, 5)
         assert r.flag == CAGR_OK
         assert r.value is not None
-        assert abs(r.value - 10.0) < 0.05  # ~9.99% since 1.1^5=161.05
+        assert abs(r.value - 10.0) < 0.05
 
 
 # ---------------------------------------------------------------------------

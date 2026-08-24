@@ -273,3 +273,120 @@ class TestLogFormatter:
         assert "TOTAL ANOMALIES: 2" in txt
         # Display-policy note should be present
         assert "DISPLAY POLICY" in txt
+
+
+# ---------------------------------------------------------------------------
+# Integration guard: run_bank_carveout must UPDATE only the Day-13 columns and
+# never clobber pre-existing ratio columns (regression for Day-14 bug where
+# load_dataframe(merge=True) DELETE+INSERT-ed rows with a 7-column DataFrame,
+# wiping ROE/ROCE/CAGR/composite to NULL).
+# ---------------------------------------------------------------------------
+class TestRunBankCarveoutNoClobber:
+    def test_existing_ratio_columns_preserved(self, tmp_path, monkeypatch):
+        import sqlite3
+
+        from scripts.day13_bank_roce import run_bank_carveout
+
+        from src.etl.database import init_schema
+
+        db_path = tmp_path / "test.db"
+        monkeypatch.setenv("NIFTY100_DB_PATH", str(db_path))
+
+        # Build a minimal schema with the columns we need.
+        init_schema(str(db_path))
+        with sqlite3.connect(db_path) as conn:
+            conn.execute(
+                "INSERT INTO companies (id, company_name, roce_percentage, roe_percentage) "
+                "VALUES (?, ?, ?, ?)",
+                ("TCS", "Tata Consultancy Services", 59.30, 30.47),
+            )
+            conn.execute(
+                "INSERT INTO sectors (company_id, broad_sector) VALUES (?, ?)",
+                ("TCS", "Information Technology"),
+            )
+            conn.execute(
+                "INSERT INTO profitandloss (company_id, year, sales, expenses, "
+                "operating_profit, opm_percentage, other_income, interest, depreciation, "
+                "profit_before_tax, tax_percentage, net_profit, eps, dividend_payout) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (
+                    "TCS",
+                    "2024-03",
+                    1000.0,
+                    750.0,
+                    250.0,
+                    25.0,
+                    10.0,
+                    5.0,
+                    20.0,
+                    235.0,
+                    25.0,
+                    176.25,
+                    50.0,
+                    30.0,
+                ),
+            )
+            conn.execute(
+                "INSERT INTO balancesheet (company_id, year, equity_capital, reserves, "
+                "borrowings, other_liabilities, total_liabilities, fixed_assets, "
+                "investments, total_assets) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                ("TCS", "2024-03", 100.0, 400.0, 0.0, 100.0, 200.0, 200.0, 100.0, 600.0),
+            )
+            conn.execute(
+                "INSERT INTO cashflow (company_id, year, operating_activity, "
+                "investing_activity, financing_activity, net_cash_flow) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
+                ("TCS", "2024-03", 200.0, -50.0, -100.0, 50.0),
+            )
+            # Pre-populate financial_ratios with non-trivial KPI values
+            conn.execute(
+                "INSERT INTO financial_ratios (company_id, year, net_profit_margin_pct, "
+                "operating_profit_margin_pct, return_on_equity_pct, roce_pct, "
+                "return_on_assets_pct, debt_to_equity, high_leverage_flag, "
+                "interest_coverage, asset_turnover, free_cash_flow_cr, capex_cr, "
+                "earnings_per_share, book_value_per_share, dividend_payout_ratio_pct, "
+                "total_debt_cr, cash_from_operations_cr, composite_quality_score) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (
+                    "TCS",
+                    "2024-03",
+                    17.625,
+                    25.0,
+                    35.25,
+                    50.0,
+                    29.375,
+                    0.0,
+                    52.0,
+                    1.67,
+                    150.0,
+                    50.0,
+                    50.0,
+                    5.0,
+                    30.0,
+                    0.0,
+                    200.0,
+                    85.0,
+                ),
+            )
+            conn.commit()
+
+        # Run the Day-13 carve-out.
+        n_anomalies, _ = run_bank_carveout()
+        assert n_anomalies >= 1
+
+        # Verify Day-13 columns populated AND existing columns were NOT wiped.
+        with sqlite3.connect(db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            row = conn.execute(
+                "SELECT * FROM financial_ratios WHERE company_id='TCS' AND year='2024-03'"
+            ).fetchone()
+        assert row is not None
+        assert row["roce_source_value"] == pytest.approx(59.30)
+        assert row["roe_source_value"] == pytest.approx(30.47)
+        assert row["roce_anomaly_category"] is not None
+        # Existing KPI values must survive (regression guard)
+        assert row["return_on_equity_pct"] == pytest.approx(35.25)
+        assert row["roce_pct"] == pytest.approx(50.0)
+        assert row["composite_quality_score"] == pytest.approx(85.0)
+        assert row["net_profit_margin_pct"] == pytest.approx(17.625)

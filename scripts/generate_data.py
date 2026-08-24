@@ -895,7 +895,14 @@ def generate_all(raw_root: Path | None = None) -> dict[str, int]:
 
     Returns a dict mapping dataset name → row count. If ``raw_root`` is
     None, writes to the default ``data/raw/`` location.
+
+    Re-seeds both ``random`` and ``numpy.random`` from SEED on every call so
+    the generated data is fully deterministic regardless of how many times
+    the RNG state was consumed between invocations (important when multiple
+    tests exercise the generator in one process).
     """
+    random.seed(SEED)
+    np.random.seed(SEED)
     if raw_root is None:
         raw_root = RAW_DIR
         sup_root = SUP_DIR
