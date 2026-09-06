@@ -27,6 +27,8 @@ from typing import Any
 import pandas as pd
 import yaml
 
+from src.analytics.valuation import classify_valuation
+from src.analytics.valuation import fcf_yield as _fcf_yield
 from src.etl.database import get_connection
 from src.utils.config import settings
 from src.utils.logger import get_logger
@@ -75,6 +77,7 @@ SCREENER_SQL = """
         p.sales,
         p.net_profit,
         mc.market_cap_crore            AS market_cap_cr,
+        mc.enterprise_value_crore      AS ev_cr,
         mc.pe_ratio,
         mc.pb_ratio,
         mc.ev_ebitda,
@@ -240,6 +243,18 @@ def load_screener_dataset(
     sql = SCREENER_SQL.format(where_year=where_year)
     with get_connection(db_path) as conn:
         df = pd.read_sql_query(sql, conn)
+
+    # Derived valuation columns (computed in Python from joined fundamentals).
+    # FCF yield — uses market_cap when available; NaN otherwise.
+    df["fcf_yield_pct"] = [
+        _fcf_yield(fcf, mc) for fcf, mc in zip(df["fcf_cr"], df["market_cap_cr"], strict=True)
+    ]
+    # Cheap/Fair/Expensive valuation bucket based on P/E, P/B, EV/EBITDA.
+    df["valuation_bucket"] = [
+        classify_valuation(pe, pb, ev)
+        for pe, pb, ev in zip(df["pe_ratio"], df["pb_ratio"], df["ev_ebitda"], strict=True)
+    ]
+
     logger.info(f"Loaded screener dataset: {len(df)} rows, {len(df.columns)} columns")
     return df
 

@@ -3,7 +3,7 @@
 # Common developer commands. Run `make help` to see all targets.
 # =============================================================================
 
-.PHONY: help install install-dev test lint format clean run-dashboard run-api load load-reset dq-review demo capital-alloc populate-ratios bank-roce screener
+.PHONY: help install install-dev test lint format clean run-dashboard run-api load load-reset dq-review demo capital-alloc populate-ratios bank-roce screener screener-list screener-export screener-export-all
 
 # Default target
 help:
@@ -22,6 +22,7 @@ help:
 	@echo "  make load-reset     Fresh ETL run: truncate tables then load"
 	@echo "  make dq-review      Run DQ manual review report (5 random companies)"
 	@echo "  make demo           Sprint 1 DB demo (table counts, sectors, top companies)"
+	@echo "  make screener-export-all   Generate output/screener_output.xlsx (one sheet per preset)"
 	@echo ""
 
 # ---- Dependency Installation ----
@@ -97,5 +98,8 @@ screener:        ## Run the screener (use PRESET=name); e.g. make screener PRESE
 screener-list:   ## List available screener presets
 	python -m scripts.run_screener --list-presets
 
-screener-export: ## Export a preset to CSV; PRESET=name OUTPUT=path
+screener-export: ## Export a preset to CSV/XLSX; PRESET=name OUTPUT=path
 	python -m scripts.run_screener --preset $(PRESET) --export $(OUTPUT)
+
+screener-export-all: ## Generate output/screener_output.xlsx with one sheet per preset
+	python -m scripts.export_screener

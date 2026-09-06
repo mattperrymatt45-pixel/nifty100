@@ -22,7 +22,7 @@ _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
 
-from src.screener import load_config, run_screener  # noqa: E402
+from src.screener import export_single_result, load_config, run_screener  # noqa: E402
 from src.utils.logger import get_logger  # noqa: E402
 
 logger = get_logger(__name__)
@@ -160,7 +160,7 @@ def main() -> int:
         args.export.parent.mkdir(parents=True, exist_ok=True)
         suffix = args.export.suffix.lower()
         if suffix in (".xlsx", ".xls"):
-            result.df.to_excel(args.export, index=False)
+            export_single_result(result, args.export)
         else:
             result.df.to_csv(args.export, index=False)
         print(f"  Exported {len(result.df)} rows to {args.export}")

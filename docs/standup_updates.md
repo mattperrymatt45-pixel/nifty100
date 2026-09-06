@@ -249,3 +249,37 @@ fixed, watch-list items, and Sprint 3 preview (Screener & Peer
 Comparison, Days 15–21). Final score: **479/479 tests passing**, Black &
 Ruff clean, spot-check deltas 0.000000 pp, commit `060b98c` pushed to
 `origin/main`.
+
+## Day 16 — Screener Preset Validation & Excel Export (Sprint 3)
+
+Implemented the valuation ratios analytics module (`src/analytics/valuation.py`)
+with P/E, P/B, EV/EBITDA, FCF Yield, and Earnings Yield primitives, plus a
+Cheap/Fair/Expensive heuristic classifier and multiple-comparison helper. All
+edge cases handled (negative earnings → None for P/E, zero book → None for
+P/B, etc.) — 26 new unit tests with 98% coverage on the module.
+
+Built the Excel exporter (`src/screener/exporter.py`) that writes a formatted
+`screener_output.xlsx` with: a Summary sheet (preset counts + filters), six
+preset sheets with 35 display columns grouped by block (Identity →
+Profitability → Growth → Leverage & Cash Quality → Valuation → Composite),
+frozen panes, auto-filter, auto-sized columns, three-color traffic-light
+conditional formatting (green = good, red = bad, correctly oriented per
+metric), dedicated number formats per column, and friendly headers. Added
+`scripts/export_screener.py` and `make screener-export-all` target. Sheet-name
+sanitisation handles long labels (GARP, Small-Cap Momentum) and illegal chars.
+
+Extended the screener SQL to include EV column, and added two derived columns
+in `load_screener_dataset()`: `fcf_yield_pct` (computed from FCF / MCap × 100)
+and `valuation_bucket` (Cheap/Fair/Expensive). 23 new exporter tests cover
+column config, sheet-name safety, workbook structure, header contents,
+Summary sheet integrity, and pandas readability of every tab.
+
+Preset results verified business-sensible: Quality Compounders 23 (COLPAL,
+GODREJCP, HEROMOTOCO, BAJAJ-AUTO, IOC, SUNPHARMA, TITAN, ASIANPAINT…),
+Dividend Aristocrats 25, GARP 7, Deep Value 4 (TATACONSUM, IOC, ADANIPOWER,
+DMART), Zero-Debt Quality 12, Small-Cap Momentum 3 — all within the spec
+ranges (§25). `output/screener_output.xlsx` generated at 45 KB with 7 sheets
+and 74 total rows.
+
+**Final score: 545/545 tests passing** (+49 new since Day 15), Black & Ruff
+clean, valuation.py 98% coverage, exporter.py 97% coverage.
