@@ -3,12 +3,13 @@
 Covers:
     * DISPLAY_COLUMNS includes expected KPIs (>=20)
     * export_screener_to_excel writes a valid .xlsx file with correct sheet count
-    * Summary sheet contains preset names and hit counts
-    * Preset sheets contain required columns (rank, Ticker, Company, Quality Score)
+    * Summary sheet contains all six spec preset names and hit counts
+    * Preset sheets contain required columns (rank, Ticker, Company, Quality Score,
+      P/E, FCF Yield, Valuation bucket)
     * Column count matches (formatted headers + no duplicate columns)
     * export_single_result creates a workbook with exactly one data sheet
     * Illegal sheet-name characters are sanitised / fall back to short labels
-    * fcf_yield_pct and valuation_bucket are present in the dataset & output
+    * fcf_yield_pct, valuation_bucket, YoY columns present in dataset & output
 """
 
 from __future__ import annotations
@@ -125,8 +126,17 @@ def test_export_workbook_structure(tmp_path: Path, cfg, preset_results) -> None:
     # Six preset sheets after
     assert len(wb.sheetnames) == 7
 
-    # Check that GARP label falls back to short name (since pretty label is >31 chars)
-    assert "GARP" in wb.sheetnames
+    # Check that all six spec presets appear as sheets (including the
+    # "Debt-Free Blue Chip" label which fits, and "Growth Accelerator" etc.)
+    for expected in (
+        "Quality Compounder",
+        "Value Pick",
+        "Growth Accelerator",
+        "Dividend Champion",
+        "Debt-Free Blue Chip",
+        "Turnaround Watch",
+    ):
+        assert expected in wb.sheetnames, f"missing sheet '{expected}'"
 
     # Check preset sheet headers contain "Company" and "Quality Score"
     for sheet_name in wb.sheetnames[1:]:

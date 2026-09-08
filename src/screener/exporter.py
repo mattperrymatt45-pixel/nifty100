@@ -246,12 +246,12 @@ class ExportResult:
 # Fallback short labels for presets whose pretty label contains illegal chars
 # or exceeds the Excel 31-char sheet-name limit.
 _FALLBACK_SHEET_LABELS: dict[str, str] = {
-    "growth_at_reasonable_price": "GARP",
-    "small_cap_momentum": "Small-Cap Momentum",
-    "debt_free": "Zero-Debt",
-    "quality_compounders": "Quality Compounders",
-    "dividend_aristocrats": "Dividend Aristocrats",
-    "deep_value": "Deep Value",
+    "quality_compounder": "Quality Compounder",
+    "value_pick": "Value Pick",
+    "growth_accelerator": "Growth Accelerator",
+    "dividend_champion": "Dividend Champion",
+    "debt_free_blue_chip": "Debt-Free Blue Chip",
+    "turnaround_watch": "Turnaround Watch",
 }
 
 

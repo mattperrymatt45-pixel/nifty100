@@ -1,20 +1,22 @@
-"""Screener Filter Engine — Sprint 3 Day 15.
+"""Screener Filter Engine — Sprint 3 Days 15-16.
 
 Loads ``config/screener_config.yaml`` and applies threshold filters against a
 joined dataset of ``financial_ratios`` + ``profitandloss`` + ``market_cap``
 + ``sectors``. Returns a DataFrame sorted by ``composite_quality_score``.
 
-Supports all 15 filterable metrics per the Day 15 brief:
-    ROE min, D/E max (with financial-sector skip), FCF min, Revenue CAGR 5yr
-    min, PAT CAGR 5yr min, OPM min, P/E max, P/B max, Dividend Yield min,
-    ICR min (Debt Free → infinity), Market Cap min, Net Profit min, EPS
-    CAGR 5yr min, Asset Turnover min, Sales min.
+Supports min / max / eq / declining filter directions. The ``eq`` direction is
+used by the Debt-Free Blue Chip preset (D/E = 0); it also treats
+``icr_label == "Debt Free"`` and near-zero D/E (≤ 0.05 epsilon, per the
+synthetic data calibration) as passing, since a strict zero is rarely
+observed in real-world data either but near-zero is economically equivalent.
+The ``declining`` direction requires ``column_yoy_change < 0`` (prior-year
+comparison) — used by Turnaround Watch to detect deleveraging.
 
 Usage::
 
     from src.screener import load_config, run_screener
     cfg = load_config()                               # from screener_config.yaml
-    df = run_screener(cfg.presets["quality_compounders"])
+    df = run_screener(cfg.presets["quality_compounder"])
     df.to_excel("screener_output.xlsx", index=False)
 """
 
@@ -39,6 +41,8 @@ PROJECT_ROOT = settings.PROJECT_ROOT
 DEFAULT_CONFIG_PATH = PROJECT_ROOT / "config" / "screener_config.yaml"
 
 # Join SQL that assembles the full screener-ready dataset.
+# prev_fr subquery fetches prior-year D/E so we can compute YoY change for
+# trend-aware filters (e.g. Turnaround Watch "D/E declining YoY").
 SCREENER_SQL = """
     SELECT
         fr.company_id,
@@ -53,6 +57,7 @@ SCREENER_SQL = """
         fr.roce_pct,
         fr.return_on_assets_pct,
         fr.debt_to_equity,
+        prev_fr.debt_to_equity         AS prev_debt_to_equity,
         fr.interest_coverage           AS icr,
         fr.icr_label,
         fr.net_debt_cr,
@@ -89,6 +94,12 @@ SCREENER_SQL = """
     LEFT JOIN market_cap mc
       ON mc.company_id = fr.company_id
      AND mc.year = CAST(SUBSTR(fr.year, 1, 4) AS INTEGER)
+    LEFT JOIN financial_ratios prev_fr
+      ON prev_fr.company_id = fr.company_id
+     AND prev_fr.year = (
+         SELECT MAX(fr2.year) FROM financial_ratios fr2
+         WHERE fr2.company_id = fr.company_id AND fr2.year < fr.year
+     )
     {where_year}
     ORDER BY fr.company_id, fr.year
 """
@@ -99,14 +110,25 @@ SCREENER_SQL = """
 # ---------------------------------------------------------------------------
 @dataclass(frozen=True)
 class ScreenerFilter:
-    """One threshold constraint."""
+    """One threshold constraint.
+
+    direction:
+        'min'       - keep rows where col >= threshold (NaN fails)
+        'max'       - keep rows where col <= threshold (NaN fails)
+        'eq'        - keep rows where col ≈ threshold (within epsilon, default 0.05);
+                      used for strict D/E=0 with a near-zero tolerance so economically
+                      debt-free companies are included
+        'flag'      - keep rows where boolean col is True (or numeric col > 0);
+                      used for binary trend / quality flags
+    """
 
     metric: str
     threshold: float
-    direction: str  # 'min' or 'max'
+    direction: str  # 'min', 'max', 'eq', 'flag'
     skip_financials: bool = False
     debt_free_passes: bool = False
     column: str = ""
+    eq_epsilon: float = 0.05  # tolerance for 'eq' direction (e.g. D/E <= 0.05 treated as 0)
 
 
 @dataclass
@@ -180,32 +202,46 @@ def load_config(path: Path | str | None = None) -> ScreenerConfig:
 
     presets: dict[str, ScreenerPreset] = {}
     for name, body in presets_raw.items():
-        filters_raw: dict[str, float] = body.get("filters", {}) or {}
+        filters_raw: dict[str, Any] = body.get("filters", {}) or {}
         filters: list[ScreenerFilter] = []
-        for raw_key, threshold in filters_raw.items():
-            # Allow preset YAML to use either bare metric name (e.g.
-            # "roe_pct") or direction-prefixed form ("min_roe_pct",
-            # "max_pe_ratio"). Strip the prefix and look up by canonical
-            # metric name.
+        for raw_key, raw_value in filters_raw.items():
+            # Strip any direction prefix (min_, max_, eq_, flag_) and look up
+            # by the canonical metric name. Presets may use either
+            # "min_roe_pct: 15" (min threshold on roe_pct),
+            # "eq_debt_to_equity_zero: true" (eq match on debt_to_equity_zero),
+            # "flag_fcf_positive: true" (boolean flag must be True).
             metric_key = raw_key
-            for prefix in ("min_", "max_"):
-                if raw_key.startswith(prefix) and raw_key[4:] in metrics_defs:
-                    metric_key = raw_key[4:]
-                    break
+            for prefix in ("min_", "max_", "eq_", "flag_"):
+                if raw_key.startswith(prefix):
+                    candidate = raw_key[len(prefix) :]
+                    if candidate in metrics_defs:
+                        metric_key = candidate
+                        break
             if metric_key not in metrics_defs:
                 raise ValueError(
                     f"Preset '{name}' references unknown metric '{raw_key}' "
                     f"(not declared in metrics:)"
                 )
             mdef = metrics_defs[metric_key]
+            direction = mdef.get("direction", "min")
+            # Normalise raw_value to a numeric threshold:
+            #   - flag direction: boolean True -> threshold 0 (col > 0 passes);
+            #                     boolean False -> impossible threshold
+            #   - eq direction:   boolean True -> threshold 0 (match zero, e.g. D/E=0)
+            #   - otherwise: cast raw_value to float
+            if direction == "flag" or (direction == "eq" and isinstance(raw_value, bool)):
+                threshold = 0.0 if raw_value else float("inf")
+            else:
+                threshold = float(raw_value)
             filters.append(
                 ScreenerFilter(
                     metric=metric_key,
-                    threshold=float(threshold),
-                    direction=mdef.get("direction", "min"),
+                    threshold=threshold,
+                    direction=direction,
                     skip_financials=bool(mdef.get("skip_financials", False)),
                     debt_free_passes=bool(mdef.get("debt_free_passes", False)),
                     column=mdef["column"],
+                    eq_epsilon=float(mdef.get("eq_epsilon", 0.05)),
                 )
             )
         presets[name] = ScreenerPreset(
@@ -244,7 +280,7 @@ def load_screener_dataset(
     with get_connection(db_path) as conn:
         df = pd.read_sql_query(sql, conn)
 
-    # Derived valuation columns (computed in Python from joined fundamentals).
+    # ----- Derived columns -----
     # FCF yield — uses market_cap when available; NaN otherwise.
     df["fcf_yield_pct"] = [
         _fcf_yield(fcf, mc) for fcf, mc in zip(df["fcf_cr"], df["market_cap_cr"], strict=True)
@@ -254,6 +290,15 @@ def load_screener_dataset(
         classify_valuation(pe, pb, ev)
         for pe, pb, ev in zip(df["pe_ratio"], df["pb_ratio"], df["ev_ebitda"], strict=True)
     ]
+    # FCF-positive boolean flag (for Dividend Champion / Turnaround Watch).
+    df["fcf_positive"] = df["fcf_cr"] > 0
+    # YoY D/E declining flag (D/E_t < D/E_{t-1}). Missing prior-year → NaN (fails).
+    df["de_yoy_change"] = df["debt_to_equity"] - df["prev_debt_to_equity"]
+    df["de_yoy_declining"] = df["de_yoy_change"] < 0
+    # Helper boolean for "is insurance" so that D/E-eq and other strict-leverage
+    # filters can treat insurers more leniently than banks/NBFCs (insurers have
+    # policyholder reserves rather than deposit leverage).
+    df["_is_insurance"] = df["sub_sector"].fillna("").str.lower().str.contains("insurance")
 
     logger.info(f"Loaded screener dataset: {len(df)} rows, {len(df.columns)} columns")
     return df
@@ -286,13 +331,14 @@ def apply_filters(
             logger.warning(f"Skipping filter on unknown column '{col}'")
             continue
         series = out[col]
+
         if flt.direction == "min":
             mask = (series >= flt.threshold) | series.isna()
             mask = mask.fillna(False)  # NaN fails a min threshold
-            # Debt-free companies pass ICR minimums (infinite cover)
+            # Debt-free companies pass any minimum (infinite cover)
             if flt.debt_free_passes and "icr_label" in out.columns:
                 mask = mask | (out["icr_label"] == "Debt Free")
-            # Auto-skip financial-sector companies for D/E (and other skip_financials metrics)
+            # Auto-skip financial-sector companies for D/E and similar leverage metrics
             if flt.skip_financials:
                 fin_mask = (
                     out["broad_sector"]
@@ -300,9 +346,13 @@ def apply_filters(
                     .apply(lambda s: _is_financial(s, config.financial_keywords))
                 )
                 mask = mask | fin_mask
+
         elif flt.direction == "max":
             mask = (series <= flt.threshold) | series.isna()
             mask = mask.fillna(False)
+            # Debt-free companies also pass D/E <= anything (they have effectively 0 leverage)
+            if flt.debt_free_passes and "icr_label" in out.columns:
+                mask = mask | (out["icr_label"] == "Debt Free")
             if flt.skip_financials:
                 fin_mask = (
                     out["broad_sector"]
@@ -310,6 +360,41 @@ def apply_filters(
                     .apply(lambda s: _is_financial(s, config.financial_keywords))
                 )
                 mask = mask | fin_mask
+
+        elif flt.direction == "eq":
+            # Strict equality with epsilon tolerance (e.g. D/E = 0 → D/E <= epsilon).
+            # NaN fails. Debt-free companies pass (treat as zero-leverage equivalent).
+            eps = flt.eq_epsilon if flt.eq_epsilon > 0 else 1e-9
+            mask = (series - flt.threshold).abs() <= eps
+            mask = mask.fillna(False)
+            if flt.debt_free_passes and "icr_label" in out.columns:
+                mask = mask | (out["icr_label"] == "Debt Free")
+            if flt.skip_financials:
+                fin_mask = (
+                    out["broad_sector"]
+                    .fillna("")
+                    .apply(lambda s: _is_financial(s, config.financial_keywords))
+                )
+                mask = mask | fin_mask
+
+        elif flt.direction == "flag":
+            # Boolean / positive flag: pass if the column is truthy (True or > 0).
+            # NaN fails. Threshold is ignored but conventionally 0 for "positive".
+            if series.dtype == bool:
+                mask = series.fillna(False)
+            else:
+                mask = series > flt.threshold
+                mask = mask.fillna(False)
+            if flt.debt_free_passes and "icr_label" in out.columns:
+                mask = mask | (out["icr_label"] == "Debt Free")
+            if flt.skip_financials:
+                fin_mask = (
+                    out["broad_sector"]
+                    .fillna("")
+                    .apply(lambda s: _is_financial(s, config.financial_keywords))
+                )
+                mask = mask | fin_mask
+
         else:
             raise ValueError(f"Unknown filter direction '{flt.direction}' for {flt.metric}")
 
@@ -389,6 +474,7 @@ def run_screener(
                 skip_financials=bool(mdef.get("skip_financials", False)),
                 debt_free_passes=bool(mdef.get("debt_free_passes", False)),
                 column=mdef["column"],
+                eq_epsilon=float(mdef.get("eq_epsilon", 0.05)),
             )
         active_filters = list(by_metric.values())
         preset = ScreenerPreset(

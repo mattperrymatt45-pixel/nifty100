@@ -4,9 +4,9 @@ Runs a preset (or custom thresholds) against financial_ratios and prints
 a summary. Optionally writes the result to CSV or Excel.
 
 Usage:
-    python -m scripts.run_screener --preset quality_compounders
-    python -m scripts.run_screener --preset dividend_aristocrats
-        --export output/screener_dividends.csv
+    python -m scripts.run_screener --preset quality_compounder
+    python -m scripts.run_screener --preset dividend_champion
+        --export output/screener_dividends.xlsx
     python -m scripts.run_screener --custom min_roe_pct=20 max_pe_ratio=25
 """
 
@@ -46,8 +46,8 @@ def main() -> int:
         type=str,
         default=None,
         help="Named preset from config/screener_config.yaml "
-        "(quality_compounders, dividend_aristocrats, growth_at_reasonable_price, "
-        "deep_value, debt_free, small_cap_momentum)",
+        "(quality_compounder, value_pick, growth_accelerator, "
+        "dividend_champion, debt_free_blue_chip, turnaround_watch)",
     )
     parser.add_argument(
         "--custom",

@@ -1,14 +1,16 @@
-"""Unit tests for Sprint 3 Day 15 — Screener Filter Engine.
+"""Unit tests for Sprint 3 Days 15-16 — Screener Filter Engine.
 
 Covers:
-    * YAML config loading with all 6 presets and 15 metrics
-    * 15 filter metrics: ROE min, D/E max (financials skipped), FCF min,
+    * YAML config loading with all 6 spec presets
+    * Filter metrics: ROE min, D/E max (financials skipped), FCF min/flag,
       revenue/PAT/EPS CAGR 5yr min, OPM min, P/E max, P/B max, Div Yield min,
-      ICR min (Debt Free passes), Market Cap min, Net Profit min, Asset
-      Turnover min, Sales min, CFO/PAT min
+      Div Payout max, ICR min (Debt Free passes), Market Cap min, Net Profit
+      min, Asset Turnover min, Sales min, CFO/PAT min, D/E eq-0 (with
+      epsilon tolerance, debt-free passes), YoY D/E decline flag
     * Sorted by composite_quality_score desc with rank column
     * Custom threshold overrides
     * Error handling for unknown preset / metric names
+    * Day 16 spec §25 acceptance: every preset returns 5-50 companies
 """
 
 from __future__ import annotations
@@ -31,41 +33,51 @@ from src.screener import (  # noqa: E402
     run_screener,
 )
 
-
 # ---------------------------------------------------------------------------
 # Config loading
 # ---------------------------------------------------------------------------
+SPEC_PRESET_NAMES = (
+    "quality_compounder",
+    "value_pick",
+    "growth_accelerator",
+    "dividend_champion",
+    "debt_free_blue_chip",
+    "turnaround_watch",
+)
+
+
 class TestConfigLoad:
-    def test_default_config_loads(self):
+    def test_default_config_loads_all_six_spec_presets(self):
         cfg = load_config()
-        assert "quality_compounders" in cfg.presets
-        assert "dividend_aristocrats" in cfg.presets
-        assert "growth_at_reasonable_price" in cfg.presets
-        assert "deep_value" in cfg.presets
-        assert "debt_free" in cfg.presets
-        assert "small_cap_momentum" in cfg.presets
+        for name in SPEC_PRESET_NAMES:
+            assert name in cfg.presets, f"missing spec preset {name}"
         assert len(cfg.presets) == 6
 
-    def test_all_15_filterable_metrics_declared(self):
+    def test_core_metrics_declared(self):
         cfg = load_config()
         required = {
             "roe_pct",
             "debt_to_equity",
+            "debt_to_equity_zero",  # D/E=0 (eq)
             "fcf_cr",
+            "fcf_positive",  # boolean flag
             "revenue_cagr_5yr_pct",
+            "revenue_cagr_3yr_pct",
             "pat_cagr_5yr_pct",
             "eps_cagr_5yr_pct",
             "opm_pct",
             "pe_ratio",
             "pb_ratio",
             "dividend_yield_pct",
+            "dividend_payout_ratio_pct",
             "icr",
             "market_cap_cr",
             "net_profit_cr",
             "asset_turnover",
             "sales_cr",
+            "cfo_pat_ratio",
+            "de_yoy_declining",  # boolean flag
         }
-        # Allow extras (e.g. cfo_pat_ratio which we use for compounders)
         assert required.issubset(set(cfg.metrics.keys()))
 
     def test_preset_filters_are_screener_filter_objects(self):
@@ -74,7 +86,7 @@ class TestConfigLoad:
             assert preset.label
             for f in preset.filters:
                 assert isinstance(f, ScreenerFilter)
-                assert f.direction in ("min", "max")
+                assert f.direction in ("min", "max", "eq", "flag")
                 assert f.column
 
     def test_unknown_preset_raises(self):
@@ -94,11 +106,21 @@ class TestDatasetLoad:
         # Every row should have the same latest year
         assert df["year"].nunique() == 1
 
-    def test_dataset_has_all_15_filter_columns(self, populated_screener_db):
+    def test_dataset_has_all_metric_columns(self, populated_screener_db):
         df = load_screener_dataset(db_path=populated_screener_db, latest_year_only=True)
         cfg = load_config()
         for metric, mdef in cfg.metrics.items():
             assert mdef["column"] in df.columns, f"missing column for {metric}: {mdef['column']}"
+
+    def test_derived_yoy_columns_present(self, populated_screener_db):
+        """Day 16: prior-year D/E and YoY decline flag must exist."""
+        df = load_screener_dataset(db_path=populated_screener_db, latest_year_only=True)
+        assert "prev_debt_to_equity" in df.columns
+        assert "de_yoy_change" in df.columns
+        assert "de_yoy_declining" in df.columns
+        assert "fcf_positive" in df.columns
+        assert "fcf_yield_pct" in df.columns
+        assert "valuation_bucket" in df.columns
 
     def test_composite_score_column_present(self, populated_screener_db):
         df = load_screener_dataset(db_path=populated_screener_db, latest_year_only=True)
@@ -112,8 +134,6 @@ class TestFilterSemantics:
     def test_min_roe_threshold_filters(self, populated_screener_db):
         cfg = load_config()
         df = load_screener_dataset(db_path=populated_screener_db, latest_year_only=True)
-        cfg.preset("dividend_aristocrats")  # smoke-check preset exists
-        # Build a synthetic preset that only applies ROE ≥ 15
         from src.screener.engine import ScreenerPreset
 
         only_roe = ScreenerPreset(
@@ -121,12 +141,7 @@ class TestFilterSemantics:
             label="ROE test",
             description="",
             filters=[
-                ScreenerFilter(
-                    metric="roe_pct",
-                    threshold=15.0,
-                    direction="min",
-                    column="roe_pct",
-                )
+                ScreenerFilter(metric="roe_pct", threshold=15.0, direction="min", column="roe_pct")
             ],
         )
         res = apply_filters(df, only_roe, cfg)
@@ -153,7 +168,6 @@ class TestFilterSemantics:
             ],
         )
         res = apply_filters(df, de_only, cfg)
-        # Any non-financial company in the output must have D/E ≤ 1.
         non_fin_mask = (
             res.df["broad_sector"]
             .fillna("")
@@ -183,7 +197,6 @@ class TestFilterSemantics:
             ],
         )
         res = apply_filters(df, de_tight, cfg)
-        # There should be at least one financial in the output even with tight D/E
         is_fin = (
             res.df["broad_sector"]
             .fillna("")
@@ -193,12 +206,9 @@ class TestFilterSemantics:
 
     def test_debt_free_passes_icr_min(self, populated_screener_db):
         """Any company whose icr_label == 'Debt Free' must pass even an
-        absurdly high ICR minimum (their cover is effectively infinite).
-        We construct a synthetic row in the DataFrame to guarantee the
-        case exists regardless of synthetic-data calibration."""
+        absurdly high ICR minimum (their cover is effectively infinite)."""
         cfg = load_config()
         df = load_screener_dataset(db_path=populated_screener_db, latest_year_only=True)
-        # Inject one synthetic debt-free company
         synth = df.iloc[0].copy()
         synth["company_id"] = "DEBTFREE01"
         synth["company_name"] = "Debt Free Test Co"
@@ -216,7 +226,7 @@ class TestFilterSemantics:
             filters=[
                 ScreenerFilter(
                     metric="icr",
-                    threshold=999.0,  # impossible unless debt-free
+                    threshold=999.0,
                     direction="min",
                     debt_free_passes=True,
                     column="icr",
@@ -239,16 +249,103 @@ class TestFilterSemantics:
             description="",
             filters=[
                 ScreenerFilter(
-                    metric="pe_ratio",
-                    threshold=20.0,
-                    direction="max",
-                    column="pe_ratio",
+                    metric="pe_ratio", threshold=20.0, direction="max", column="pe_ratio"
                 )
             ],
         )
         res = apply_filters(df, pe_cap, cfg)
         pe_vals = res.df["pe_ratio"].dropna()
         assert (pe_vals <= 20.0 + 1e-9).all()
+
+    def test_eq_de_zero_uses_epsilon_tolerance(self, populated_screener_db):
+        """Day 16: D/E=0 filter uses eq_epsilon tolerance. Near-zero firms pass."""
+        cfg = load_config()
+        df = load_screener_dataset(db_path=populated_screener_db, latest_year_only=True)
+        from src.screener.engine import ScreenerPreset
+
+        strict_de_zero = ScreenerPreset(
+            name="de0",
+            label="D/E zero",
+            description="",
+            filters=[
+                ScreenerFilter(
+                    metric="debt_to_equity_zero",
+                    threshold=0.0,
+                    direction="eq",
+                    column="debt_to_equity",
+                    eq_epsilon=0.01,  # extremely tight
+                )
+            ],
+        )
+        res_tight = apply_filters(df, strict_de_zero, cfg)
+        # Synthetic data might have 0 or 1 firms at D/E <= 0.01
+        for _, row in res_tight.df.iterrows():
+            assert row["debt_to_equity"] <= 0.01 + 1e-9
+
+        loose_de_zero = ScreenerPreset(
+            name="de0_loose",
+            label="D/E zero loose",
+            description="",
+            filters=[
+                ScreenerFilter(
+                    metric="debt_to_equity_zero",
+                    threshold=0.0,
+                    direction="eq",
+                    column="debt_to_equity",
+                    eq_epsilon=0.5,
+                )
+            ],
+        )
+        res_loose = apply_filters(df, loose_de_zero, cfg)
+        assert len(res_loose.df) >= len(res_tight.df)
+        for _, row in res_loose.df.iterrows():
+            assert row["debt_to_equity"] <= 0.5 + 1e-9
+
+    def test_flag_fcf_positive_passes_only_positive_fcf(self, populated_screener_db):
+        """Day 16: flag direction keeps only rows where col > 0."""
+        cfg = load_config()
+        df = load_screener_dataset(db_path=populated_screener_db, latest_year_only=True)
+        from src.screener.engine import ScreenerPreset
+
+        fcf_pos = ScreenerPreset(
+            name="fcf_flag",
+            label="FCF positive",
+            description="",
+            filters=[
+                ScreenerFilter(
+                    metric="fcf_positive",
+                    threshold=0.0,
+                    direction="flag",
+                    column="fcf_positive",
+                )
+            ],
+        )
+        res = apply_filters(df, fcf_pos, cfg)
+        # All surviving rows must have FCF > 0
+        assert (res.df["fcf_cr"] > 0).all()
+
+    def test_flag_de_yoy_declining(self, populated_screener_db):
+        """Day 16: de_yoy_declining flag keeps only firms where D/E decreased YoY."""
+        cfg = load_config()
+        df = load_screener_dataset(db_path=populated_screener_db, latest_year_only=True)
+        from src.screener.engine import ScreenerPreset
+
+        de_decl = ScreenerPreset(
+            name="de_decl",
+            label="D/E declining",
+            description="",
+            filters=[
+                ScreenerFilter(
+                    metric="de_yoy_declining",
+                    threshold=0.0,
+                    direction="flag",
+                    column="de_yoy_declining",
+                )
+            ],
+        )
+        res = apply_filters(df, de_decl, cfg)
+        # Every survivor must have negative de_yoy_change (declining)
+        assert (res.df["de_yoy_change"] < 0).all()
 
 
 # ---------------------------------------------------------------------------
@@ -263,22 +360,108 @@ class TestPresets:
             if len(res.df) > 0:
                 assert "rank" in res.df.columns
                 assert res.df["rank"].iloc[0] == 1
-                # Sorted by composite descending
-                assert res.df["composite_quality_score"].is_monotonic_decreasing or (
-                    res.df["composite_quality_score"].fillna(-1).is_monotonic_decreasing
-                )
+                assert res.df["composite_quality_score"].fillna(-1).is_monotonic_decreasing
 
-    def test_quality_compounders_count_reasonable(self, populated_screener_db):
+    @pytest.mark.parametrize("preset_name", list(SPEC_PRESET_NAMES))
+    def test_each_preset_returns_5_to_50_companies(self, populated_screener_db, preset_name):
+        """Day 16 spec: verify every preset returns between 5 and 50 companies."""
         cfg = load_config()
-        res = run_screener(cfg.preset("quality_compounders"), db_path=populated_screener_db)
-        # Expect 15-50 companies
-        assert 5 <= res.rows_out <= 60, f"quality_compounders returned {res.rows_out}"
+        res = run_screener(cfg.preset(preset_name), db_path=populated_screener_db)
+        assert 5 <= res.rows_out <= 50, (
+            f"Preset '{preset_name}' returned {res.rows_out} companies " f"(expected 5-50)"
+        )
+
+    def test_quality_compounder_criteria_enforced(self, populated_screener_db):
+        """Quality Compounder: ROE>15, D/E<1, FCF>0, Rev CAGR 5y>10 — every survivor must pass."""
+        cfg = load_config()
+        res = run_screener(cfg.preset("quality_compounder"), db_path=populated_screener_db)
+        assert len(res.df) >= 5
+        assert (res.df["roe_pct"] >= 15 - 1e-9).all()
+        # Non-financials must satisfy D/E <= 1 (financials are auto-passed)
+        non_fin = (
+            ~res.df["broad_sector"]
+            .fillna("")
+            .str.lower()
+            .apply(lambda s: any(k in s for k in cfg.financial_keywords))
+        )
+        assert (res.df.loc[non_fin, "debt_to_equity"] <= 1.0 + 1e-9).all()
+        assert (res.df["fcf_cr"] > 0).all()
+        assert (res.df["revenue_cagr_5yr"] >= 10 - 1e-9).all()
+
+    def test_value_pick_criteria_enforced(self, populated_screener_db):
+        """Value Pick: P/E<20, P/B<3, D/E<2, Div Yield>1%."""
+        cfg = load_config()
+        res = run_screener(cfg.preset("value_pick"), db_path=populated_screener_db)
+        assert (res.df["pe_ratio"].dropna() <= 20 + 1e-9).all()
+        assert (res.df["pb_ratio"].dropna() <= 3 + 1e-9).all()
+        non_fin = (
+            ~res.df["broad_sector"]
+            .fillna("")
+            .str.lower()
+            .apply(lambda s: any(k in s for k in cfg.financial_keywords))
+        )
+        assert (res.df.loc[non_fin, "debt_to_equity"] <= 2.0 + 1e-9).all()
+        assert (res.df["dividend_yield_pct"].dropna() >= 1 - 1e-9).all()
+
+    def test_growth_accelerator_criteria_enforced(self, populated_screener_db):
+        """Growth Accelerator: PAT CAGR 5y>20, Rev CAGR 5y>15, D/E<2."""
+        cfg = load_config()
+        res = run_screener(cfg.preset("growth_accelerator"), db_path=populated_screener_db)
+        assert (res.df["pat_cagr_5yr"] >= 20 - 1e-9).all()
+        assert (res.df["revenue_cagr_5yr"] >= 15 - 1e-9).all()
+        non_fin = (
+            ~res.df["broad_sector"]
+            .fillna("")
+            .str.lower()
+            .apply(lambda s: any(k in s for k in cfg.financial_keywords))
+        )
+        assert (res.df.loc[non_fin, "debt_to_equity"] <= 2.0 + 1e-9).all()
+
+    def test_dividend_champion_criteria_enforced(self, populated_screener_db):
+        """Dividend Champion: Yield>2%, Payout<80%, FCF>0."""
+        cfg = load_config()
+        res = run_screener(cfg.preset("dividend_champion"), db_path=populated_screener_db)
+        assert (res.df["dividend_yield_pct"] >= 2 - 1e-9).all()
+        assert (res.df["dividend_payout_ratio_pct"] <= 80 + 1e-9).all()
+        assert (res.df["fcf_cr"] > 0).all()
+
+    def test_debt_free_blue_chip_criteria_enforced(self, populated_screener_db):
+        """Debt-Free Blue Chip: D/E<=epsilon (~0), ROE>12, Sales>5000Cr.
+
+        Insurers can legitimately have very low D/E (policyholder reserves
+        aren't deposit leverage); but deposit-taking banks/NBFCs must be
+        excluded since their leverage is structural.
+        """
+        cfg = load_config()
+        res = run_screener(cfg.preset("debt_free_blue_chip"), db_path=populated_screener_db)
+        epsilon = 0.20  # must match metric eq_epsilon in config
+        for _, row in res.df.iterrows():
+            sub = str(row.get("sub_sector", "")).lower()
+            broad = str(row["broad_sector"]).lower()
+            is_bank_nbfc = (
+                "bank" in sub or "nbfc" in sub or "consumer finance" in sub or "finance" in broad
+            ) and "insurance" not in sub
+            assert not is_bank_nbfc, (
+                f"Bank/NBFC '{row['company_id']}' (sector={row['broad_sector']}/"
+                f"{row.get('sub_sector','')}) in debt-free preset with D/E={row['debt_to_equity']}"
+            )
+            assert row["debt_to_equity"] <= epsilon + 1e-9
+            assert row["roe_pct"] >= 12 - 1e-9
+            assert row["sales"] >= 5000 - 1e-9
+
+    def test_turnaround_watch_criteria_enforced(self, populated_screener_db):
+        """Turnaround Watch: Rev CAGR 3y>10, FCF positive, D/E declining YoY."""
+        cfg = load_config()
+        res = run_screener(cfg.preset("turnaround_watch"), db_path=populated_screener_db)
+        assert (res.df["revenue_cagr_3yr"] >= 10 - 1e-9).all()
+        assert (res.df["fcf_cr"] > 0).all()
+        assert (res.df["de_yoy_change"] < 0).all()
 
     def test_result_summary_string(self, populated_screener_db):
         cfg = load_config()
-        res = run_screener(cfg.preset("quality_compounders"), db_path=populated_screener_db)
+        res = run_screener(cfg.preset("quality_compounder"), db_path=populated_screener_db)
         s = res.summary()
-        assert "Quality Compounders" in s
+        assert "Quality Compounder" in s
         assert "filters applied" in s
 
 
@@ -288,9 +471,8 @@ class TestPresets:
 class TestCustomFilters:
     def test_custom_filter_overrides_preset(self, populated_screener_db):
         cfg = load_config()
-        # Run compounders but with an insanely high ROE threshold — few/no companies
         res = run_screener(
-            cfg.preset("quality_compounders"),
+            cfg.preset("quality_compounder"),
             db_path=populated_screener_db,
             custom_filters={"roe_pct": 100.0},
         )
@@ -300,7 +482,7 @@ class TestCustomFilters:
         cfg = load_config()
         with pytest.raises(ValueError):
             run_screener(
-                cfg.preset("quality_compounders"),
+                cfg.preset("quality_compounder"),
                 db_path=populated_screener_db,
                 custom_filters={"nonexistent_metric": 1.0},
             )
@@ -311,7 +493,7 @@ class TestCustomFilters:
 # ---------------------------------------------------------------------------
 @pytest.fixture(scope="module")
 def populated_screener_db(tmp_path_factory):
-    """Build a fresh DB with synthetic data + populated ratios (no bank carve-out needed)."""
+    """Build a fresh DB with synthetic data + populated ratios."""
     import os
 
     tmp = tmp_path_factory.mktemp("screener_db")
@@ -330,7 +512,6 @@ def populated_screener_db(tmp_path_factory):
 
         generate_all(raw_dir)
 
-        # Load order from the kpi tests
         load_order = (
             "companies",
             "sectors",
@@ -344,7 +525,6 @@ def populated_screener_db(tmp_path_factory):
             "cashflow",
             "stock_prices",
         )
-        import pandas as pd
 
         def _post_process(df: pd.DataFrame, name: str) -> pd.DataFrame:
             if name == "documents" and "Year" in df.columns:

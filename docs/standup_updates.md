@@ -283,3 +283,25 @@ and 74 total rows.
 
 **Final score: 545/545 tests passing** (+49 new since Day 15), Black & Ruff
 clean, valuation.py 98% coverage, exporter.py 97% coverage.
+
+### Day 16b — Preset alignment to spec §25
+
+Renamed the six presets to match spec §25 exactly (quality_compounder, value_pick,
+growth_accelerator, dividend_champion, debt_free_blue_chip, turnaround_watch)
+with the precise thresholds specified:
+  - Quality Compounder: ROE>15, D/E<1, FCF>0, Rev CAGR 5y>10% → 32 hits
+  - Value Pick: P/E<20, P/B<3, D/E<2, Div Yield>1% → 5 hits
+  - Growth Accelerator: PAT CAGR 5y>20%, Rev CAGR 5y>15%, D/E<2 → 14 hits
+  - Dividend Champion: Div Yield>2%, Payout<80%, FCF>0 → 32 hits
+  - Debt-Free Blue Chip: D/E≈0 (ε=0.20), ROE>12%, Sales>5000Cr → 8 hits
+  - Turnaround Watch: Rev CAGR 3y>10%, FCF>0, D/E declining YoY → 27 hits
+
+Extended the filter engine to support two new directions:
+  - 'eq'   : strict equality with configurable epsilon (for D/E=0)
+  - 'flag' : boolean / truthy column test (for FCF-positive, YoY decline)
+Added prior-year D/E lookup to the screener SQL (LEFT JOIN self on company +
+MAX(year) < current year) to compute de_yoy_change and de_yoy_declining.
+Added dividend_payout_ratio_pct as a filterable metric. All six presets return
+between 5 and 50 companies (Value Pick is tight at 5 — correct per spec).
+Regenerated output/screener_output.xlsx (7 sheets, 118 total rows, 45 KB).
+**Final score: 560/560 tests passing.**

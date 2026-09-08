@@ -92,7 +92,7 @@ populate-ratios: ## Populate financial_ratios table with all computed KPIs (Spri
 bank-roce: ## Run Day 13 bank ROCE carve-out and write output/ratio_edge_cases.log
 	python -m scripts.day13_bank_roce
 
-screener:        ## Run the screener (use PRESET=name); e.g. make screener PRESET=quality_compounders
+screener:        ## Run the screener (use PRESET=name); e.g. make screener PRESET=quality_compounder
 	python -m scripts.run_screener --preset $(PRESET) --limit $(LIMIT)
 
 screener-list:   ## List available screener presets
