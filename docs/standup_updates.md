@@ -388,3 +388,42 @@ After fixes: **581/581 tests passing** (560 prior + 21 new), Black &
 Ruff clean, `output/screener_output.xlsx` regenerated with 7 sheets /
 118 rows / green-red threshold colouring, composite score & sector
 rank columns visible on every preset sheet.
+
+## Day 18 — Peer Percentile Rankings (Sprint 3)
+
+Built `src/analytics/peer.py` implementing SQL-style `PERCENT_RANK()` for the
+10 spec metrics across the 11 defined peer groups: ROE, ROCE, Net Profit
+Margin, D/E (inverted — lower is better), Free Cash Flow, PAT CAGR 5y,
+Revenue CAGR 5y, EPS CAGR 5y, Interest Coverage, Asset Turnover.
+
+The rank function uses the standard SQL formula `(rank - 1)/(n - 1)` with
+`method='min'` tie handling, guaranteeing the best peer in each group
+scores 1.0 and the worst scores 0.0. Solo-company groups (if any) get a
+neutral 0.5. NaN metric values propagate as SQL NULL (no rank). D/E is
+inverted via `1 - percent_rank` so that the lowest leverage scores 1.0.
+
+Created the `peer_percentiles` table in `db/schema.sql` (with an
+`ensure_schema()` helper for idempotent creation) and a supporting index
+on `(peer_group_name, metric, year)`. Added the Day-18 populator script
+`scripts/day18_peer_percentiles.py` and wired the table into
+`reset_tables`, `_pk_for_table` and schema tooling.
+
+Populated the production DB for year 2024-03: **540 rows** (54 companies
+x 10 metrics across 11 peer groups). 35 Nifty-100 companies lack a peer
+group assignment; per spec these receive the message
+"No peer group assigned" without raising an error (the list is logged
+and surfaced in the script summary). `peer_percentile_for_company()`
+returns either a 10-row DataFrame of peer percentiles or the literal
+string `"No peer group assigned"`.
+
+Added 20 new unit tests in `tests/analytics/test_peer.py` covering the
+metric registry (10 metrics, D/E inverted, others higher=better), rank
+semantics (strict order, ties, inversion, solo-peer neutral, NaN
+propagation), live-DB long-form shape (11 groups, ≥540 rows, all
+percentiles in [0,1], best=1/worst=0 in every group/metric cohort), the
+no-peer cohort listing, single-company lookup (DataFrame vs. message),
+schema creation, and idempotent repopulation (row count does not
+double). Defensive prod-DB fixture pattern from Day 17 reused.
+
+**Final score: 601/601 tests passing** (581 prior + 20 new), Black &
+Ruff clean. `output/screener_output.xlsx` unchanged.

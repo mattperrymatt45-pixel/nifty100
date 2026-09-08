@@ -218,6 +218,7 @@ def reset_tables(
         "validation_failures",
         "load_audit",
         "prosandcons",
+        "peer_percentiles",
         "peer_groups",
         "financial_ratios",
         "market_cap",
@@ -343,6 +344,8 @@ def _pk_for_table(table: str, df_cols: list[str]) -> list[str] | None:
         return _resolve("company_id", "year")  # matches capital-Y "Year" case-insensitively
     if table == "peer_groups":
         return _resolve("company_id", "peer_group_name")
+    if table == "peer_percentiles":
+        return _resolve("company_id", "peer_group_name", "metric", "year")
     if table in ("sectors", "analysis"):
         return _resolve("company_id")
     if table == "prosandcons":

@@ -8,6 +8,7 @@ Modules:
     sector_roce    - Bank/NBFC ROCE carve-out + source cross-check (Sprint 2 Day 13).
     valuation      - Valuation multiples (P/E, P/B, EV/EBITDA, FCF yield) (Sprint 3 Day 16).
     composite      - Composite Quality Score 0-100, sector-relative (Sprint 3 Day 17).
+    peer           - Peer-group percentile rankings for 10 KPIs (Sprint 3 Day 18).
 """
 
 from src.analytics.cagr import (
@@ -82,6 +83,16 @@ from src.analytics.leverage import (
     interest_coverage_ratio,
     net_debt,
 )
+from src.analytics.peer import (
+    NO_PEER_GROUP_MSG,
+    PEER_METRICS,
+    PeerMetric,
+    companies_without_peer_group,
+    compute_peer_percentiles,
+    ensure_schema,
+    peer_percentile_for_company,
+    populate_peer_percentiles,
+)
 from src.analytics.ratios import (
     FINANCIAL_SECTOR_KEYWORDS,
     OPM_CROSSCHECK_TOLERANCE,
@@ -155,6 +166,7 @@ __all__ = [
     "HIGH_LEVERAGE_DE_THRESHOLD",
     "ICR_DEBT_FREE_LABEL",
     "ICR_WARNING_THRESHOLD",
+    "NO_PEER_GROUP_MSG",
     "OPM_CROSSCHECK_TOLERANCE",
     "PATTERN_CASH_ACCUMULATOR",
     "PATTERN_DISTRESS_SIGNAL",
@@ -166,6 +178,7 @@ __all__ = [
     "PATTERN_SHAREHOLDER_RETURNS",
     "PB_EXPENSIVE",
     "PB_FAIR_UPPER",
+    "PEER_METRICS",
     "PE_CHEAP",
     "PE_EXPENSIVE",
     "PE_FAIR_LOWER",
@@ -189,6 +202,7 @@ __all__ = [
     "CompanyCAGRs",
     "CompositeResult",
     "LeverageRatios",
+    "PeerMetric",
     "ProfitabilityRatios",
     "ROCEAnomaly",
     "ValuationCheck",
@@ -202,6 +216,7 @@ __all__ = [
     "cfo_quality_tier",
     "classify_capital_allocation",
     "classify_valuation",
+    "companies_without_peer_group",
     "compare_multiples",
     "compute_all_cagrs",
     "compute_bank_roce",
@@ -211,6 +226,7 @@ __all__ = [
     "compute_composite_scores",
     "compute_fcf_cagr_5yr",
     "compute_leverage_ratios",
+    "compute_peer_percentiles",
     "compute_profitability_ratios",
     "compute_valuation_ratios",
     "cross_check_vs_source",
@@ -218,6 +234,7 @@ __all__ = [
     "earnings_yield",
     "ebit",
     "ebit_margin",
+    "ensure_schema",
     "ev_to_ebitda",
     "fcf_conversion",
     "fcf_yield",
@@ -232,6 +249,8 @@ __all__ = [
     "net_debt",
     "net_profit_margin",
     "operating_profit_margin",
+    "peer_percentile_for_company",
+    "populate_peer_percentiles",
     "price_to_book",
     "price_to_earnings",
     "return_on_assets",

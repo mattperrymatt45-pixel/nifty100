@@ -306,3 +306,23 @@ CREATE INDEX IF NOT EXISTS idx_mcap_year          ON market_cap(year);
 CREATE INDEX IF NOT EXISTS idx_ratios_year        ON financial_ratios(year);
 CREATE INDEX IF NOT EXISTS idx_peers_group        ON peer_groups(peer_group_name);
 CREATE INDEX IF NOT EXISTS idx_vf_severity        ON validation_failures(severity);
+
+-- -----------------------------------------------------------------------------
+-- 12b. peer_percentiles — Day 18: PERCENT_RANK (0–1) for 10 metrics within each
+--      peer group. One row per (company, peer_group, metric, year).
+-- -----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS peer_percentiles (
+    company_id       TEXT    NOT NULL,
+    peer_group_name  TEXT    NOT NULL,
+    metric           TEXT    NOT NULL,
+    value            REAL,
+    percentile_rank  REAL,
+    year             TEXT    NOT NULL,
+    computed_at      TEXT,
+    PRIMARY KEY (company_id, peer_group_name, metric, year),
+    FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE,
+    FOREIGN KEY (company_id, peer_group_name)
+        REFERENCES peer_groups(company_id, peer_group_name) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_pp_group_metric   ON peer_percentiles(peer_group_name, metric, year);
+CREATE INDEX IF NOT EXISTS idx_pp_company_year   ON peer_percentiles(company_id, year);
