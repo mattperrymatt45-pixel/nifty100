@@ -305,3 +305,86 @@ Added dividend_payout_ratio_pct as a filterable metric. All six presets return
 between 5 and 50 companies (Value Pick is tight at 5 — correct per spec).
 Regenerated output/screener_output.xlsx (7 sheets, 118 total rows, 45 KB).
 **Final score: 560/560 tests passing.**
+
+## Day 17 — Composite Quality Score & Threshold-Coloured Export (Sprint 3)
+
+Implemented the Day-17 composite quality score per spec §25.1 in a new
+`src/analytics/composite.py` module. The score is a weighted 0–100 scale:
+
+  - **35% Profitability** — ROE 15% + ROCE 10% + NPM 10%
+  - **30% Cash Quality** — FCF CAGR 5y 15% + CFO/PAT 10% + FCF-positive flag 5%
+  - **20% Growth**        — Revenue CAGR 5y 10% + PAT CAGR 5y 10%
+  - **15% Leverage**      — D/E piecewise 10% + ICR piecewise 5%
+
+Every continuous metric is winsorised at the **P10/P90** cross-section
+percentiles to neutralise outliers, then min-max scaled to 0–100. Leverage
+metrics use spec-defined piecewise-linear anchors:
+  - D/E: (0,100), (0.5,85), (1.0,70), (2.0,50), (5.0,0) — lower is better.
+  - ICR: (10,100), (5,75), (3,50), (1.5,0) — higher is better.
+Debt-free companies (`icr_label == "Debt Free"`) are awarded a perfect
+ICR score of 100.
+
+FCF CAGR 5y is computed directly from the `cashflow` table via
+`compute_fcf_cagr_5yr()`, requiring an exact 5-calendar-year base and a
+positive base FCF; turnarounds / insufficient history return NaN (assigned
+neutral 50 score after scaling so they don't distort ranks).
+
+On top of the overall `composite_score_100`, a **sector-relative score** is
+produced by re-min-maxing within each `broad_sector` (single-company
+sectors get a neutral 50). Two ranks are emitted: `composite_rank`
+(universe 1..N, contiguous) and `sector_rank` (per-sector rank, nullable
+Int64 to defend against NaN scores).
+
+The screener dataset loader (`load_screener_dataset`) now calls
+`compute_composite_scores()` automatically when `latest_year_only=True`,
+merging in `fcf_cagr_5yr`, all ten component `*_score` columns, the sector
+relative score, and both ranks; the legacy `composite_quality_score`
+column is aliased to the new score so sort logic stays unified.
+
+Upgraded the Excel exporter (`src/screener/exporter.py`) with per-cell
+threshold colour coding:
+  - **Green fill (#C6EFCE)** — value passes the preset's threshold for
+    that metric.
+  - **Red fill (#FFC7CE)** — value is in a filtered column but fails the
+    threshold (these are rare because `apply_filters` already excludes
+    failing companies, but financial-skip / debt-free-pass edge cases
+    keep some near-threshold cells visible for analyst review).
+  - Alternating light row fill otherwise.
+The title row now reads e.g. "Quality Compounder — 32 of 89 companies
+(sorted by composite score, 0-100; green=passes threshold, red=fails)".
+
+Added 21 new unit tests in `tests/kpi/test_composite.py` covering:
+weights sum to 1.00 (and the sub-totals 35/30/20/15 exactly), winsorise
+caps, minmax scale semantics (including reverse scale for leverage and
+the constant-series-returns-50 guard), piecewise-linear interpolation at
+exact anchors and midpoints with out-of-range clipping, FCF CAGR
+computation against the live DB, CompositeResult contract, 0–100
+bounds on both overall and sector-relative scores, contiguous
+universe ranks starting at 1, per-sector ranks starting at 1,
+descending-sort invariant, and presence of every component column.
+
+**Bug fixed during QA:** The test suite intermittently produced NaN
+scores with "boolean value of NA is ambiguous" when running full-suite
+orderings. Root cause: `tests/etl/test_exploratory_queries.py` used
+`object.__setattr__(settings, "DB_PATH", …)` to repoint the frozen
+settings singleton at a temp DB but never restored it (monkeypatch
+handles `os.environ`, not the in-process singleton). Later
+module-scoped fixtures in `tests/kpi/test_composite.py` and
+`tests/screener/test_exporter.py` that only did `os.environ.pop(...)`
+still inherited the stale `settings.DB_PATH` pointing at a deleted
+tmp directory, so `load_screener_dataset()` connected to an empty
+file and returned 79 NaN rows. Fixed two ways:
+  1. The exploratory-queries helper now saves and restores the
+     original `settings.RAW_DATA_DIR / PROCESSED_DATA_DIR / DB_PATH`
+     in a `try/finally`, so it can never leak.
+  2. Composite/exporter production-DB fixtures now explicitly pass
+     `db_path=str(settings.PROJECT_ROOT / "db" / "nifty100.db")` to
+     every `load_screener_dataset`, `run_screener`, and
+     `compute_composite_scores` call, and also reset
+     `os.environ["NIFTY100_DB_PATH"]` and `settings.DB_PATH` to the
+     production path defensively.
+
+After fixes: **581/581 tests passing** (560 prior + 21 new), Black &
+Ruff clean, `output/screener_output.xlsx` regenerated with 7 sheets /
+118 rows / green-red threshold colouring, composite score & sector
+rank columns visible on every preset sheet.

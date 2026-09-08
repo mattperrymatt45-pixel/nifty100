@@ -31,7 +31,6 @@ from pathlib import Path
 
 import pandas as pd
 from openpyxl import Workbook
-from openpyxl.formatting.rule import CellIsRule, ColorScaleRule
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 
@@ -45,7 +44,8 @@ logger = __import__("logging").getLogger(__name__)
 # ---------------------------------------------------------------------------
 DISPLAY_COLUMNS: list[str] = [
     # Identity
-    "rank",
+    "composite_rank",
+    "sector_rank",
     "company_id",
     "company_name",
     "broad_sector",
@@ -61,6 +61,7 @@ DISPLAY_COLUMNS: list[str] = [
     # Growth
     "revenue_cagr_5yr",
     "pat_cagr_5yr",
+    "fcf_cagr_5yr",
     "eps_cagr_5yr",
     "revenue_cagr_3yr",
     # Leverage & cash quality
@@ -78,6 +79,7 @@ DISPLAY_COLUMNS: list[str] = [
     "pb_ratio",
     "ev_ebitda",
     "dividend_yield_pct",
+    "dividend_payout_ratio_pct",
     "fcf_yield_pct",
     "valuation_bucket",
     "market_cap_cr",
@@ -85,10 +87,13 @@ DISPLAY_COLUMNS: list[str] = [
     "net_profit",
     # Composite
     "composite_quality_score",
+    "sector_relative_score",
 ]
 
 # Number format per column (for Excel number_format)
 COLUMN_FORMATS: dict[str, str] = {
+    "composite_rank": "0",
+    "sector_rank": "0",
     "rank": "0",
     "roe_pct": "0.00",
     "roce_pct": "0.00",
@@ -97,6 +102,7 @@ COLUMN_FORMATS: dict[str, str] = {
     "return_on_assets_pct": "0.00",
     "revenue_cagr_5yr": "0.00",
     "pat_cagr_5yr": "0.00",
+    "fcf_cagr_5yr": "0.00",
     "eps_cagr_5yr": "0.00",
     "revenue_cagr_3yr": "0.00",
     "debt_to_equity": "0.00",
@@ -110,19 +116,22 @@ COLUMN_FORMATS: dict[str, str] = {
     "pb_ratio": "0.00",
     "ev_ebitda": "0.00",
     "dividend_yield_pct": "0.00",
+    "dividend_payout_ratio_pct": "0.0",
     "fcf_yield_pct": "0.00",
     "market_cap_cr": "#,##0",
     "sales": "#,##0",
     "net_profit": "#,##0",
     "composite_quality_score": "0.0",
+    "sector_relative_score": "0.0",
     "eps": "0.00",
     "book_value_per_share": "0.00",
-    "dividend_payout_ratio_pct": "0.0",
     "cash_from_operations_cr": "#,##0",
 }
 
 # Friendly header labels (replace underscores, title case)
 HEADER_RENAMES: dict[str, str] = {
+    "composite_rank": "Rank",
+    "sector_rank": "Sector #",
     "rank": "Rank",
     "company_id": "Ticker",
     "company_name": "Company",
@@ -137,14 +146,15 @@ HEADER_RENAMES: dict[str, str] = {
     "return_on_assets_pct": "ROA (%)",
     "revenue_cagr_5yr": "Rev CAGR 5y (%)",
     "pat_cagr_5yr": "PAT CAGR 5y (%)",
+    "fcf_cagr_5yr": "FCF CAGR 5y (%)",
     "eps_cagr_5yr": "EPS CAGR 5y (%)",
     "revenue_cagr_3yr": "Rev CAGR 3y (%)",
     "debt_to_equity": "D/E",
     "icr": "ICR",
     "icr_label": "ICR Label",
-    "net_debt_cr": "Net Debt (₹Cr)",
+    "net_debt_cr": "Net Debt (RsCr)",
     "asset_turnover": "Asset Turnover",
-    "fcf_cr": "FCF (₹Cr)",
+    "fcf_cr": "FCF (RsCr)",
     "fcf_conversion_pct": "FCF Conv (%)",
     "cfo_pat_ratio": "CFO/PAT",
     "capital_allocation_pattern": "Cap. Alloc.",
@@ -152,16 +162,17 @@ HEADER_RENAMES: dict[str, str] = {
     "pb_ratio": "P/B",
     "ev_ebitda": "EV/EBITDA",
     "dividend_yield_pct": "Div Yield (%)",
+    "dividend_payout_ratio_pct": "Payout (%)",
     "fcf_yield_pct": "FCF Yield (%)",
     "valuation_bucket": "Valuation",
-    "market_cap_cr": "Mkt Cap (₹Cr)",
-    "sales": "Sales (₹Cr)",
-    "net_profit": "Net Profit (₹Cr)",
+    "market_cap_cr": "Mkt Cap (RsCr)",
+    "sales": "Sales (RsCr)",
+    "net_profit": "Net Profit (RsCr)",
     "composite_quality_score": "Quality Score",
-    "eps": "EPS (₹)",
-    "book_value_per_share": "BVPS (₹)",
-    "dividend_payout_ratio_pct": "Payout (%)",
-    "cash_from_operations_cr": "CFO (₹Cr)",
+    "sector_relative_score": "Sector Score",
+    "eps": "EPS (Rs)",
+    "book_value_per_share": "BVPS (Rs)",
+    "cash_from_operations_cr": "CFO (RsCr)",
 }
 
 # Columns where higher = better (colour scale green→red for descending)
@@ -174,6 +185,7 @@ HIGHER_IS_BETTER: frozenset[str] = frozenset(
         "return_on_assets_pct",
         "revenue_cagr_5yr",
         "pat_cagr_5yr",
+        "fcf_cagr_5yr",
         "eps_cagr_5yr",
         "revenue_cagr_3yr",
         "icr",
@@ -184,6 +196,7 @@ HIGHER_IS_BETTER: frozenset[str] = frozenset(
         "dividend_yield_pct",
         "fcf_yield_pct",
         "composite_quality_score",
+        "sector_relative_score",
         "net_profit",
         "sales",
         "market_cap_cr",
@@ -211,6 +224,8 @@ THIN_BORDER = Border(
 )
 BENCHMARK_FILL = PatternFill("solid", fgColor="FFF2CC")  # light yellow for benchmark row
 ALT_ROW_FILL = PatternFill("solid", fgColor="F7F9FC")
+PASS_FILL = PatternFill("solid", fgColor="C6EFCE")  # light green for passing preset threshold
+FAIL_FILL = PatternFill("solid", fgColor="FFC7CE")  # light red for failing preset threshold
 
 
 def _safe_sheet_name(name: str) -> str:
@@ -255,6 +270,35 @@ _FALLBACK_SHEET_LABELS: dict[str, str] = {
 }
 
 
+def _passes_filter(value, flt) -> bool | None:
+    """Return True if value passes this ScreenerFilter, False if it fails,
+    None if the cell is for a column that isn't filtered by this preset (or
+    the value is NaN on a non-filtered column).
+
+    Used for cell-level colour coding (green = pass, red = fail).
+    """
+    import math
+
+    if value is None:
+        return False
+    try:
+        v = float(value)
+    except (TypeError, ValueError):
+        return None
+    if math.isnan(v):
+        return False
+    if flt.direction == "min":
+        return v >= flt.threshold - 1e-9
+    if flt.direction == "max":
+        return v <= flt.threshold + 1e-9
+    if flt.direction == "eq":
+        eps = flt.eq_epsilon if flt.eq_epsilon > 0 else 1e-9
+        return abs(v - flt.threshold) <= eps
+    if flt.direction == "flag":
+        return bool(v)
+    return None
+
+
 def _write_result_sheet(
     wb: Workbook,
     result: ScreenerResult,
@@ -273,6 +317,22 @@ def _write_result_sheet(
     df = result.df[cols].copy()
     df = _rename_columns(df)
 
+    # Build a per-column lookup of which filter applies (so we can colour-code cells)
+    header_to_orig = {v: k for k, v in HEADER_RENAMES.items()}
+    col_filter = {}
+    for flt in result.filters_applied:
+        # Map the filter's data column (e.g. "fcf_positive") to the DISPLAY_COLUMN
+        # that represents it in the exported sheet ("fcf_cr" for positive flag,
+        # "de_yoy_declining" is not displayed, so skip).
+        display_col = flt.column
+        # flag filters map to the underlying metric column for display purposes
+        if flt.metric == "fcf_positive":
+            display_col = "fcf_cr"
+        if display_col not in cols:
+            continue
+        friendly_name = HEADER_RENAMES.get(display_col, display_col)
+        col_filter[friendly_name] = flt
+
     # ---- Header ----
     header_font = HEADER_FONT
     header_fill = HEADER_FILL
@@ -283,7 +343,7 @@ def _write_result_sheet(
         cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
         cell.border = THIN_BORDER
 
-    # ---- Data rows ----
+    # ---- Data rows with pass/fail colour coding ----
     for row_idx, (_, row) in enumerate(df.iterrows(), start=2):
         alt_fill = ALT_ROW_FILL if (row_idx % 2 == 0) else None
         for col_idx, col_name in enumerate(df.columns, start=1):
@@ -293,20 +353,27 @@ def _write_result_sheet(
             cell = ws.cell(row=row_idx, column=col_idx, value=value)
             cell.border = THIN_BORDER
             # Reverse-map original column key for number formatting
-            orig_col = None
-            for k, v in HEADER_RENAMES.items():
-                if v == col_name:
-                    orig_col = k
-                    break
+            orig_col = header_to_orig.get(col_name)
             if orig_col and orig_col in COLUMN_FORMATS:
                 cell.number_format = COLUMN_FORMATS[orig_col]
-            if alt_fill is not None:
-                cell.fill = alt_fill
+
+            # Cell-level fill: green if the value passes the corresponding preset
+            # filter, red if it's in a filtered column but fails; otherwise
+            # alternate row shading.
+            flt = col_filter.get(col_name)
+            fill_to_use = alt_fill
+            if flt is not None and value is not None:
+                ok = _passes_filter(value, flt)
+                if ok is True:
+                    fill_to_use = PASS_FILL
+                elif ok is False:
+                    fill_to_use = FAIL_FILL
+            if fill_to_use is not None:
+                cell.fill = fill_to_use
 
     # ---- Column widths ----
     for col_idx, col_name in enumerate(df.columns, start=1):
         letter = get_column_letter(col_idx)
-        # Auto-size based on header + sample values (cap to reasonable range)
         max_len = len(str(col_name))
         sample_vals = df[col_name].dropna().astype(str).head(20).tolist()
         for v in sample_vals:
@@ -317,64 +384,15 @@ def _write_result_sheet(
     ws.freeze_panes = "D2"  # freeze rank/ticker/company + header
     ws.auto_filter.ref = ws.dimensions
 
-    # ---- Conditional formatting ----
-    # Reverse map header -> original key so we know which metric each column is
-    header_to_orig = {v: k for k, v in HEADER_RENAMES.items()}
-    n_rows = len(df)
-    if n_rows > 0:
-        for col_idx, col_name in enumerate(df.columns, start=1):
-            letter = get_column_letter(col_idx)
-            orig = header_to_orig.get(col_name)
-            rng = f"{letter}2:{letter}{n_rows + 1}"
-            if orig in HIGHER_IS_BETTER:
-                rule = ColorScaleRule(
-                    start_type="min",
-                    start_color="F8696B",
-                    mid_type="percentile",
-                    mid_value=50,
-                    mid_color="FFEB84",
-                    end_type="max",
-                    end_color="63BE7B",
-                )
-                ws.conditional_formatting.add(rng, rule)
-            elif orig in LOWER_IS_BETTER:
-                rule = ColorScaleRule(
-                    start_type="min",
-                    start_color="63BE7B",
-                    mid_type="percentile",
-                    mid_value=50,
-                    mid_color="FFEB84",
-                    end_type="max",
-                    end_color="F8696B",
-                )
-                ws.conditional_formatting.add(rng, rule)
-            elif orig == "composite_quality_score":
-                # Green >= 70, red < 40
-                ws.conditional_formatting.add(
-                    rng,
-                    CellIsRule(
-                        operator="greaterThanOrEqual",
-                        formula=["70"],
-                        fill=PatternFill("solid", fgColor="C6EFCE"),
-                    ),
-                )
-                ws.conditional_formatting.add(
-                    rng,
-                    CellIsRule(
-                        operator="lessThan",
-                        formula=["40"],
-                        fill=PatternFill("solid", fgColor="FFC7CE"),
-                    ),
-                )
-
     # ---- Title row (insert at top) ----
     ws.insert_rows(1)
     ws.cell(
         row=1,
         column=1,
-        value=f"{result.preset_label} — {result.rows_out} of {result.rows_in} companies",
+        value=f"{result.preset_label} — {result.rows_out} of {result.rows_in} companies "
+        f"(sorted by composite score, 0-100; green=passes threshold, red=fails)",
     ).font = Font(bold=True, size=13, color="1F4E78")
-    ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=min(len(df.columns), 10))
+    ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=min(len(df.columns), 12))
     ws.row_dimensions[1].height = 22
 
     return name

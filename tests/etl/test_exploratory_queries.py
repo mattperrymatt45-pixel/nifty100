@@ -36,7 +36,12 @@ def _load_db_with_synthetic_data(tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     sup_dir.mkdir(parents=True)
     processed.mkdir(parents=True)
 
-    # Thaw the frozen settings so we can repoint dirs
+    # Thaw the frozen settings so we can repoint dirs; save originals to
+    # restore afterwards so we don't pollute later module-scoped tests that
+    # rely on the production DB path.
+    orig_raw = cfg_mod.settings.RAW_DATA_DIR
+    orig_proc = cfg_mod.settings.PROCESSED_DATA_DIR
+    orig_db = cfg_mod.settings.DB_PATH
     object.__setattr__(cfg_mod.settings, "RAW_DATA_DIR", raw_dir)
     object.__setattr__(cfg_mod.settings, "PROCESSED_DATA_DIR", processed)
     object.__setattr__(cfg_mod.settings, "DB_PATH", db_path)
@@ -46,16 +51,24 @@ def _load_db_with_synthetic_data(tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 
     from src.etl.database import get_connection, init_schema, reset_tables
 
-    generate_all(raw_dir)
-    init_schema(str(db_path))
-    reset_tables(db_path=str(db_path))
-    run_etl()
+    try:
+        generate_all(raw_dir)
+        init_schema(str(db_path))
+        reset_tables(db_path=str(db_path))
+        run_etl()
 
-    # Sanity: companies = 92
-    with get_connection(str(db_path)) as conn:
-        (n,) = conn.execute("SELECT COUNT(*) FROM companies").fetchone()
-        assert n == 92, f"Expected 92 companies, got {n}"
-    return db_path
+        # Sanity: companies = 92
+        with get_connection(str(db_path)) as conn:
+            (n,) = conn.execute("SELECT COUNT(*) FROM companies").fetchone()
+            assert n == 92, f"Expected 92 companies, got {n}"
+        return db_path
+    finally:
+        # Restore the production settings so sibling module fixtures aren't
+        # poisoned by our tmp DB path (monkeypatch handles os.environ; the
+        # frozen settings singleton needs manual restoration).
+        object.__setattr__(cfg_mod.settings, "RAW_DATA_DIR", orig_raw)
+        object.__setattr__(cfg_mod.settings, "PROCESSED_DATA_DIR", orig_proc)
+        object.__setattr__(cfg_mod.settings, "DB_PATH", orig_db)
 
 
 def _parse_queries(sql_text: str) -> list[tuple[int, str]]:

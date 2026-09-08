@@ -44,7 +44,7 @@ class TestDisplayColumns:
         assert len(DISPLAY_COLUMNS) >= 20
 
     def test_core_identity_columns_present(self) -> None:
-        for c in ("rank", "company_id", "company_name", "broad_sector", "year"):
+        for c in ("composite_rank", "company_id", "company_name", "broad_sector", "year"):
             assert c in DISPLAY_COLUMNS
 
     def test_core_valuation_columns_present(self) -> None:
@@ -88,19 +88,40 @@ def cfg():
     return load_config()
 
 
+def _prod_db() -> str:
+    """Return the absolute path to the production DB and reset env/settings
+    to point at it. This defends against sibling module-scoped fixtures that
+    mutate ``os.environ`` or the frozen ``settings`` singleton without
+    restoring it cleanly (notably test_exploratory_queries._load_db_with_
+    synthetic_data, which uses ``object.__setattr__`` on settings.DB_PATH).
+    """
+    import os
+    from pathlib import Path
+
+    from src.utils.config import settings
+
+    prod_db = str(settings.PROJECT_ROOT / "db" / "nifty100.db")
+    os.environ["NIFTY100_DB_PATH"] = prod_db
+    object.__setattr__(settings, "DB_PATH", Path(prod_db))
+    return prod_db
+
+
 @pytest.fixture(scope="module")
 def preset_results(cfg):
+    db_path = _prod_db()
     out = {}
     for name, preset in cfg.presets.items():
-        out[name] = run_screener(preset, config=cfg)
+        out[name] = run_screener(preset, config=cfg, db_path=db_path)
     return out
 
 
 def test_dataset_has_valuation_columns() -> None:
-    df = load_screener_dataset()
+    db_path = _prod_db()
+    df = load_screener_dataset(db_path=db_path)
     assert "fcf_yield_pct" in df.columns
     assert "valuation_bucket" in df.columns
     assert "ev_cr" in df.columns
+    assert "fcf_cagr_5yr" in df.columns
     # valuation_bucket should only contain our three buckets
     assert set(df["valuation_bucket"].dropna().unique()).issubset({"Cheap", "Fair", "Expensive"})
 
@@ -171,7 +192,8 @@ def test_summary_sheet_contains_preset_rows(tmp_path: Path, cfg, preset_results)
 
 
 def test_export_single_result_one_sheet(tmp_path: Path) -> None:
-    df = load_screener_dataset()
+    db_path = _prod_db()
+    df = load_screener_dataset(db_path=db_path)
     # Fake ScreenerResult for smoke test
     res = ScreenerResult(
         preset_name="custom",

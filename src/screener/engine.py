@@ -29,6 +29,7 @@ from typing import Any
 import pandas as pd
 import yaml
 
+from src.analytics.composite import CompositeResult, compute_composite_scores
 from src.analytics.valuation import classify_valuation
 from src.analytics.valuation import fcf_yield as _fcf_yield
 from src.etl.database import get_connection
@@ -265,6 +266,7 @@ def load_config(path: Path | str | None = None) -> ScreenerConfig:
 def load_screener_dataset(
     db_path: Path | str | None = None,
     latest_year_only: bool = True,
+    include_composite_scores: bool = True,
 ) -> pd.DataFrame:
     """Load the joined screener dataset from the SQLite database.
 
@@ -272,6 +274,9 @@ def load_screener_dataset(
         db_path: Override DB path; defaults to settings.DB_PATH.
         latest_year_only: If True (default) keep only the most recent year
             per company. If False return all company-year rows.
+        include_composite_scores: If True (default) compute the Day-17
+            composite score (P10/P90 winsorised, 0-100) and sector-relative
+            score. Only meaningful when ``latest_year_only=True``.
     """
     where_year = (
         "WHERE fr.year = (SELECT MAX(year) FROM financial_ratios)" if latest_year_only else ""
@@ -296,9 +301,17 @@ def load_screener_dataset(
     df["de_yoy_change"] = df["debt_to_equity"] - df["prev_debt_to_equity"]
     df["de_yoy_declining"] = df["de_yoy_change"] < 0
     # Helper boolean for "is insurance" so that D/E-eq and other strict-leverage
-    # filters can treat insurers more leniently than banks/NBFCs (insurers have
-    # policyholder reserves rather than deposit leverage).
+    # filters can treat insurers more leniently than banks/NBFCs.
     df["_is_insurance"] = df["sub_sector"].fillna("").str.lower().str.contains("insurance")
+
+    # Day 17: recompute composite score (P10/P90 winsorised, spec §25.1 weights)
+    # and add sector-relative score + ranks. This is only meaningful for the
+    # latest-year cross-section; in multi-year mode we keep the legacy score.
+    if latest_year_only and include_composite_scores:
+        result = compute_composite_scores(df, db_path=db_path)
+        df = result.df
+        # Alias the new score onto the column name used by sort logic below.
+        df["composite_quality_score"] = df[CompositeResult.OVERALL]
 
     logger.info(f"Loaded screener dataset: {len(df)} rows, {len(df.columns)} columns")
     return df

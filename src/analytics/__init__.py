@@ -7,6 +7,7 @@ Modules:
     cashflow_kpis  - Cash-flow quality + capital allocation (Sprint 2, Day 11).
     sector_roce    - Bank/NBFC ROCE carve-out + source cross-check (Sprint 2 Day 13).
     valuation      - Valuation multiples (P/E, P/B, EV/EBITDA, FCF yield) (Sprint 3 Day 16).
+    composite      - Composite Quality Score 0-100, sector-relative (Sprint 3 Day 17).
 """
 
 from src.analytics.cagr import (
@@ -50,6 +51,22 @@ from src.analytics.cashflow_kpis import (
     fcf_conversion,
     free_cash_flow,
     write_capital_allocation_csv,
+)
+from src.analytics.composite import (
+    W_CFO_PAT,
+    W_DE,
+    W_FCF_CAGR,
+    W_FCF_POS,
+    W_ICR,
+    W_NPM,
+    W_PAT_CAGR,
+    W_REV_CAGR,
+    W_ROCE,
+    W_ROE,
+    CompositeResult,
+    compute_component_scores,
+    compute_composite_scores,
+    compute_fcf_cagr_5yr,
 )
 from src.analytics.leverage import (
     HIGH_LEVERAGE_DE_THRESHOLD,
@@ -156,10 +173,21 @@ __all__ = [
     "ROCE_DELTA_THRESHOLD_PP",
     "ROE_DELTA_THRESHOLD_PP",
     "VALID_FLAGS",
+    "W_CFO_PAT",
+    "W_DE",
+    "W_FCF_CAGR",
+    "W_FCF_POS",
+    "W_ICR",
+    "W_NPM",
+    "W_PAT_CAGR",
+    "W_REV_CAGR",
+    "W_ROCE",
+    "W_ROE",
     "CAGRResult",
     "CapitalAllocationRow",
     "CashFlowKPIs",
     "CompanyCAGRs",
+    "CompositeResult",
     "LeverageRatios",
     "ProfitabilityRatios",
     "ROCEAnomaly",
@@ -179,6 +207,9 @@ __all__ = [
     "compute_bank_roce",
     "compute_cagrs_for_series",
     "compute_cashflow_kpis_for_company",
+    "compute_component_scores",
+    "compute_composite_scores",
+    "compute_fcf_cagr_5yr",
     "compute_leverage_ratios",
     "compute_profitability_ratios",
     "compute_valuation_ratios",
