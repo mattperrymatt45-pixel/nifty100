@@ -9,6 +9,7 @@ Modules:
     valuation      - Valuation multiples (P/E, P/B, EV/EBITDA, FCF yield) (Sprint 3 Day 16).
     composite      - Composite Quality Score 0-100, sector-relative (Sprint 3 Day 17).
     peer           - Peer-group percentile rankings for 10 KPIs (Sprint 3 Day 18).
+    radar_charts   - 8-axis polar radar charts per company vs peer group (Sprint 3 Day 19).
 """
 
 from src.analytics.cagr import (
@@ -92,6 +93,12 @@ from src.analytics.peer import (
     ensure_schema,
     peer_percentile_for_company,
     populate_peer_percentiles,
+)
+from src.analytics.radar_charts import (
+    RadarData,
+    generate_radar_charts,
+    plot_company_radar,
+    plot_standalone_chart,
 )
 from src.analytics.ratios import (
     FINANCIAL_SECTOR_KEYWORDS,
@@ -205,6 +212,7 @@ __all__ = [
     "PeerMetric",
     "ProfitabilityRatios",
     "ROCEAnomaly",
+    "RadarData",
     "ValuationCheck",
     "ValuationRatios",
     "asset_turnover",
@@ -240,6 +248,7 @@ __all__ = [
     "fcf_yield",
     "format_anomaly_log",
     "free_cash_flow",
+    "generate_radar_charts",
     "high_leverage_flag",
     "icr_display_label",
     "icr_warning_flag",
@@ -250,6 +259,8 @@ __all__ = [
     "net_profit_margin",
     "operating_profit_margin",
     "peer_percentile_for_company",
+    "plot_company_radar",
+    "plot_standalone_chart",
     "populate_peer_percentiles",
     "price_to_book",
     "price_to_earnings",

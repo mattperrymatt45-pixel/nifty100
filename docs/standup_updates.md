@@ -427,3 +427,42 @@ double). Defensive prod-DB fixture pattern from Day 17 reused.
 
 **Final score: 601/601 tests passing** (581 prior + 20 new), Black &
 Ruff clean. `output/screener_output.xlsx` unchanged.
+
+## Day 19 — Radar Charts (Sprint 3)
+
+Built `src/analytics/radar_charts.py` generating 8-axis polar/radar charts
+for every Nifty-100 company comparing each metric against its peer group.
+The eight axes (per spec §27) are ROE, ROCE, NPM, D/E (inverted — lower
+leverage scores higher), FCF Quality (CFO/PAT ratio percentile), PAT CAGR
+5y, Revenue CAGR 5y, and Composite Score. All values use the Day-18
+SQL-style PERCENT_RANK `(rank-1)/(n-1)` within peer groups so every axis
+sits on the same 0–1 (0%–100%) scale, keeping the chart readable.
+
+The company's values are rendered as a filled blue polygon; the peer-group
+mean is overlaid as a dashed red outline for immediate benchmarking.
+Concentric grid circles at 25/50/75/100%, readable fonts (10pt axis
+labels, 15pt bold title, 10.5pt grey subtitle), DPI 140, tight layout and
+a soft-blue background make each chart legible at standard viewing size.
+
+Companies with NO peer group (35 of 89) receive a standalone horizontal
+bar chart comparing each of the 8 raw metric values against the Nifty-100
+average. Metrics are normalised to the larger of |company| and |Nifty avg|
+so all eight bars fit on a common scale; D/E is inverted so that "longer
+bar = better than average", with a dotted reference line at 1.0 marking
+the Nifty benchmark.
+
+Output is written to `reports/radar_charts/<company_id>_radar.png` (89
+PNGs total — 54 peer-radar + 35 standalone). Added
+`scripts/day19_radar_charts.py` as the CLI entry point (`python -m
+scripts.day19_radar_charts [--year YEAR] [--output-dir DIR]`).
+
+Added 13 unit tests in `tests/visuals/test_radar.py` covering:
+axis-key registry (8 axes including inverted D/E), PERCENT_RANK semantics
+(strict order, ties, inversion, solo-peer neutral 0.5), single-chart PNG
+output (exists, non-trivial size, valid PNG format, sensible
+dimensions), standalone bar chart output, and end-to-end batch generation
+(one PNG per company = 89 total, `<TICKER>_radar.png` filename convention
+verified for TCS/HDFCBANK/ADANIENT, all files valid PNGs).
+
+**Final score: 614/614 tests passing** (601 prior + 13 new), Black & Ruff
+clean, 89 PNGs (≈110KB each) generated under `reports/radar_charts/`.
