@@ -684,3 +684,65 @@ target is already wired to the new entry point.
 
 **Final score: 711/711 tests passing** (668 prior + 43 new), Black &
 Ruff clean.
+
+## Day 23 - Home Screen & Company Profile Screen (Sprint 4)
+
+Fleshed out the Home and Company Profile screens with data-driven KPIs
+and Plotly charts.
+
+**Home screen (01_home.py):**
+  * **Six KPI tiles** at the top: Average ROE, Median P/E, Median D/E,
+    Total Companies, Median Revenue CAGR 5y, Debt-Free Companies count.
+    Debt-free is defined as `icr_label == "Debt Free" OR D/E <= 0.05`
+    (defends against the icr_label being NULL in the current DB build).
+  * **Plotly donut chart** - 11 broad sectors with company-count
+    breakdown (Set3 palette, labels + percent outside the ring).
+  * **Top-5 composite-quality table** - Ticker, Company, Sector, ROE,
+    D/E, Rev CAGR 5y, Composite score.
+  * **Sidebar year selector (2019-2024)** - every tile, chart and
+    table reacts to the selected FY via the new `get_kpis_for_year()`
+    helper.
+  * Collapsible "Full constituent table" listing all 89 companies for
+    the chosen year.
+
+**Company Profile screen (02_profile.py):**
+  * **Search box + autocomplete** - free-text input filters the
+    dropdown to matching tickers/companies (case-insensitive substring
+    match); dropdown selection returns the chosen ticker.
+  * **Company card** - name, NSE ticker, sector, sub-sector, market-cap
+    category, website link and "about" description in a left-bordered
+    info box.
+  * **Six KPI tiles** (latest FY): ROE, ROCE, Net Profit Margin, D/E,
+    Revenue CAGR 5y, Free Cash Flow (Cr), with "n/a" fallback for NaNs.
+  * **10-year grouped bar chart** of Revenue (sales) vs Net Profit
+    (Plotly grouped bars, blue/green palette).
+  * **ROE & ROCE dual-axis line chart** over available history (solid
+    blue ROE, dashed red ROCE, lines+markers).
+  * **Pros & Cons badges** split from the free-form
+    `prosandcons` text field, rendered as :green[+] and :red[x] bullet
+    lists; companies without any entry get a friendly "No data"
+    caption.
+  * Friendly "Ticker not found - please try another." message when the
+    ticker has no match.
+
+**DB helpers added in `src/dashboard/utils/db.py`:**
+  * `get_kpis_for_year(year)` - joins financial_ratios to companies,
+    sectors, peer_groups, market_cap for a given FY (mcap joined by
+    calendar year extracted from FY).
+  * `get_available_years()` - descending list of FY labels.
+  * `get_company_about(ticker)` - identity dict for a ticker (empty
+    dict when not found).
+  * `get_prosandcons(ticker)` - splits raw newline/bullet-delimited
+    text into (pros, cons) lists (caps at 8 items each).
+
+Added 11 new tests covering the new helpers (required-query contract,
+KPIs shape for 2024-03 and 2019-03, descending year list, company
+about present / missing, pros/cons populated vs empty for missing
+ticker).
+
+**Verified:** `streamlit run src/dashboard/app.py` starts on 0.0.0.0:8501,
+HTTP 200 OK at `/`, `/_stcore/health` returns "ok", zero tracebacks in
+server log after rendering the Home screen.
+
+**Final score: 722/722 tests passing** (711 prior + 11 new), Black &
+Ruff clean.

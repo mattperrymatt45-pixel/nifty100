@@ -257,6 +257,96 @@ def get_valuation(ticker: str) -> pd.DataFrame:
 
 
 @st.cache_data(ttl=600)
+def get_kpis_for_year(year: str) -> pd.DataFrame:
+    """Return all companies' ratios for a given FY joined to sector and mcap.
+
+    Used by the Home screen so KPI tiles/top-5 update when the year selector
+    changes. Market-cap columns are outer-joined (mcap data starts FY 2019).
+    """
+    yr_int = int(year[:4])
+    query = """
+        SELECT fr.company_id AS ticker,
+               c.company_name,
+               s.broad_sector,
+               s.sub_sector,
+               s.market_cap_category,
+               pg.peer_group_name,
+               fr.return_on_equity_pct AS roe_pct,
+               fr.roce_pct,
+               fr.net_profit_margin_pct AS npm_pct,
+               fr.debt_to_equity,
+               fr.interest_coverage AS icr,
+               fr.icr_label,
+               fr.revenue_cagr_5yr,
+               fr.pat_cagr_5yr,
+               fr.free_cash_flow_cr AS fcf_cr,
+               fr.cfo_pat_ratio,
+               fr.composite_quality_score,
+               mc.pe_ratio,
+               mc.pb_ratio,
+               mc.dividend_yield_pct,
+               mc.market_cap_crore
+        FROM financial_ratios fr
+        JOIN companies c ON c.id = fr.company_id
+        LEFT JOIN sectors s ON s.company_id = fr.company_id
+        LEFT JOIN peer_groups pg ON pg.company_id = fr.company_id
+        LEFT JOIN market_cap mc ON mc.company_id = fr.company_id
+           AND mc.year = :yr_int
+        WHERE fr.year = :year
+        ORDER BY fr.composite_quality_score DESC NULLS LAST
+    """
+    return _get_conn().query(query, params={"year": year, "yr_int": yr_int}, ttl=600)
+
+
+@st.cache_data(ttl=600)
+def get_available_years() -> list[str]:
+    """Return descending list of FY labels present in financial_ratios."""
+    query = "SELECT DISTINCT year FROM financial_ratios ORDER BY year DESC"
+    df = _get_conn().query(query, ttl=600)
+    return df["year"].tolist()
+
+
+@st.cache_data(ttl=600)
+def get_prosandcons(ticker: str) -> tuple[list[str], list[str]]:
+    """Return (pros, cons) lists split from the free-form text field."""
+    import re
+
+    query = "SELECT pros, cons FROM prosandcons WHERE company_id = :ticker LIMIT 1"
+    df = _get_conn().query(query, params={"ticker": ticker}, ttl=600)
+    if df.empty:
+        return [], []
+
+    def _split(text: object) -> list[str]:
+        if text is None or not isinstance(text, str) or not text.strip():
+            return []
+        lines: list[str] = []
+        for raw in re.split(r"[\n\r]+|\s{2,}", text):
+            cleaned = re.sub(r"^[\s•\-\*\d\)\.]+", "", raw).strip().strip(":-)").strip()
+            if len(cleaned) >= 10:
+                lines.append(cleaned)
+        return lines[:8]
+
+    return _split(df.iloc[0]["pros"]), _split(df.iloc[0]["cons"])
+
+
+@st.cache_data(ttl=600)
+def get_company_about(ticker: str) -> dict:
+    """Return the companies-row dict for ``ticker`` (empty dict if missing)."""
+    query = """
+        SELECT c.id AS ticker, c.company_name, c.about_company, c.website,
+               c.roce_percentage AS roce_display, c.roe_percentage AS roe_display,
+               s.broad_sector, s.sub_sector, s.market_cap_category
+        FROM companies c
+        LEFT JOIN sectors s ON s.company_id = c.id
+        WHERE c.id = :ticker
+    """
+    df = _get_conn().query(query, params={"ticker": ticker}, ttl=600)
+    if df.empty:
+        return {}
+    return df.iloc[0].to_dict()
+
+
+@st.cache_data(ttl=600)
 def run_sql(query: str, params: dict[str, Any] | None = None) -> pd.DataFrame:
     """Escape hatch - run arbitrary read-only SQL (used by the Trends screen)."""
     return _get_conn().query(query, params=params or {}, ttl=600)

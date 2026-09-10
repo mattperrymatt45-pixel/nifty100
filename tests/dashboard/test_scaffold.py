@@ -123,6 +123,10 @@ REQUIRED_QUERIES = [
     "get_peer_groups",
     "get_latest_ratios",
     "get_peer_percentiles",
+    "get_kpis_for_year",
+    "get_available_years",
+    "get_prosandcons",
+    "get_company_about",
     "run_sql",
     "invalidate_cache",
 ]
@@ -246,3 +250,76 @@ def test_pages_directory_has_eight_files() -> None:
         "07_capital.py",
         "08_reports.py",
     ]
+
+
+# ---------------------------------------------------------------------------
+# Day 23 helpers - kpis_for_year, years, pros/cons, company_about
+# ---------------------------------------------------------------------------
+def test_get_kpis_for_year_latest_shape() -> None:
+    from src.dashboard.utils import db
+
+    df = db.get_kpis_for_year("2024-03")
+    assert len(df) == 89
+    for col in [
+        "ticker",
+        "company_name",
+        "broad_sector",
+        "roe_pct",
+        "debt_to_equity",
+        "revenue_cagr_5yr",
+        "composite_quality_score",
+        "pe_ratio",
+    ]:
+        assert col in df.columns
+
+
+def test_get_kpis_for_year_2019() -> None:
+    from src.dashboard.utils import db
+
+    # 2019 is the earliest market-cap year per the day-23 spec; must not raise
+    df = db.get_kpis_for_year("2019-03")
+    assert len(df) >= 1
+
+
+def test_get_available_years_descending() -> None:
+    from src.dashboard.utils import db
+
+    years = db.get_available_years()
+    assert "2024-03" in years
+    assert "2019-03" in years
+    assert years == sorted(years, reverse=True)
+
+
+def test_get_company_about_tcs() -> None:
+    from src.dashboard.utils import db
+
+    info = db.get_company_about("TCS")
+    assert info
+    assert info["ticker"] == "TCS"
+    assert "company_name" in info
+    assert "broad_sector" in info
+
+
+def test_get_company_about_missing() -> None:
+    from src.dashboard.utils import db
+
+    assert db.get_company_about("__GHOST__") == {}
+
+
+def test_get_prosandcons_returns_two_lists() -> None:
+    from src.dashboard.utils import db
+
+    pros, cons = db.get_prosandcons("TCS")
+    assert isinstance(pros, list) and isinstance(cons, list)
+    # HINDUNILVR has populated pros/cons in production DB
+    pros, cons = db.get_prosandcons("HINDUNILVR")
+    assert len(pros) >= 1
+    assert len(cons) >= 1
+
+
+def test_get_prosandcons_unknown_returns_empty() -> None:
+    from src.dashboard.utils import db
+
+    pros, cons = db.get_prosandcons("__GHOST__")
+    assert pros == []
+    assert cons == []
