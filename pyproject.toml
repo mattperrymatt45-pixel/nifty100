@@ -98,6 +98,9 @@ ignore = [
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F401", "F403"]
 "tests/*" = ["D", "S101"]
+# Streamlit multi-page convention uses numeric-prefixed filenames (01_home.py)
+# which violate pep8-naming's N999 module-name rule.
+"src/dashboard/pages/[0-9][0-9]_*.py" = ["N999"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["src"]

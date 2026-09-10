@@ -630,3 +630,57 @@ sheets, IT Services and FMCG peer rankings verified correct, all 14
 DQ rule unit tests pass, 668 total tests green. Demo of
 screener_output.xlsx and peer_comparison.xlsx completed. Sprint 3
 review **signed off**.
+
+## Day 22 - Streamlit App Scaffold (Sprint 4)
+
+Bootstrapped the Sprint 4 Streamlit dashboard under `src/dashboard/`. The
+new architecture:
+
+  * **`src/dashboard/app.py`** - main entry point with manual sidebar
+    navigation across all 8 screens. Sets Streamlit page config (wide
+    layout, page title "Nifty 100 Analytics", sidebar expanded),
+    dispatches to each page's `render()` function via a `PAGES`
+    registry keyed by emoji-prefixed labels.
+  * **`src/dashboard/pages/`** - the 8 screen modules following the
+    spec's numeric-prefixed naming convention so they also work in
+    native Streamlit multi-page mode:
+    `01_home.py` Home/Overview (KPI tiles, peer-group summary, full
+    constituent table),
+    `02_profile.py` Company Profile (ticker selector, identity panel),
+    `03_screener.py` Screener shell (preset dropdown, top-20 universe),
+    `04_peers.py` Peer Comparison shell,
+    `05_trends.py`, `06_sectors.py`, `07_capital.py`, `08_reports.py`
+    placeholder pages that describe upcoming behaviour. A package
+    `__init__.py` re-exports the numeric files under friendly
+    short names (`home`, `profile`, ...) so `app.py` doesn't couple
+    to the file-numbering scheme.
+  * **`src/dashboard/utils/db.py`** - shared data access layer wrapping
+    `st.connection("sql", url="sqlite:///...")` with
+    `@st.cache_data(ttl=600)` applied to every query function. Exposes
+    the spec-mandated helpers - `get_companies()`,
+    `get_ratios(ticker, year=None)`, `get_pl(ticker)`, `get_bs(ticker)`,
+    `get_cf(ticker)`, `get_sectors()`, `get_peers(group_name)`,
+    `get_valuation(ticker)` - plus extras needed across screens
+    (`get_latest_ratios`, `get_peer_groups`, `get_peer_percentiles`,
+    `run_sql`, `invalidate_cache`). The `get_valuation` helper joins
+    `market_cap` to `financial_ratios` and derives `fcf_yield_pct`
+    (FCF / MCap * 100) to seed next week's valuation work.
+
+Added a per-file-ignore for N999 on `src/dashboard/pages/[0-9][0-9]_*.py`
+in `pyproject.toml` so the numeric-prefixed Streamlit filenames don't
+trip pep8-naming. Added 43 new unit tests in
+`tests/dashboard/test_scaffold.py` covering module imports, the
+`render()` contract on every page, the 8-screen registry, every
+documented db helper, live-DB result shapes (92 companies, 89 latest-
+year ratios, 11 peer groups, TCS history >= 5 years, IT Services
+membership, FCF-yield column presence), cache invalidation idempotency,
+page-config settings (wide layout + expanded sidebar + correct title),
+and the presence of all 8 numeric-prefixed files.
+
+**Verified:** `streamlit run src/dashboard/app.py` starts Uvicorn on
+port 8501, `/_stcore/health` returns `ok`, the root route returns
+HTTP 200, no tracebacks in the server log, and `make run-dashboard`
+target is already wired to the new entry point.
+
+**Final score: 711/711 tests passing** (668 prior + 43 new), Black &
+Ruff clean.
