@@ -466,3 +466,53 @@ verified for TCS/HDFCBANK/ADANIENT, all files valid PNGs).
 
 **Final score: 614/614 tests passing** (601 prior + 13 new), Black & Ruff
 clean, 89 PNGs (≈110KB each) generated under `reports/radar_charts/`.
+
+## Day 20 — Peer Comparison Excel Report (Sprint 3)
+
+Built `src/analytics/peer_report.py` generating `output/peer_comparison.xlsx`
+with one sheet per peer group (11 sheets total: Automobiles, Consumer
+Finance, FMCG, IT Services, Life Insurance, Oil & Gas, Pharmaceuticals,
+Power & Utilities, Private Banks, Public Banks, Steel & Metals). Each
+sheet contains:
+
+  * Identity columns: Ticker, Company.
+  * 20 metric columns spanning profitability (ROE, ROCE, NPM, OPM, ROA),
+    leverage (D/E, ICR), cash quality (FCF, FCF Yield, CFO/PAT), growth
+    (Rev/PAT CAGR 3y, Rev/PAT/EPS CAGR 5y), efficiency (Asset Turnover),
+    valuation (P/E, P/B, Div Yield) and the composite quality score.
+    Raw market-cap-derived columns (P/E, P/B, Div Yield, FCF Yield) are
+    pulled from the `market_cap` table (aliased from `market_cap_crore`).
+  * A matching percentile-rank column for every metric using SQL-style
+    PERCENT_RANK within the peer group, with D/E, P/E, and P/B inverted
+    so that lower = better. Rows are sorted by composite percentile
+    descending so the best-in-group company appears first.
+  * Quartile colour-coding on percentile cells: green (#C6EFCE) for
+    >= P75 (top quartile), yellow (#FFEB9C) for P25–P75, red (#FFC7CE)
+    for <= P25 (bottom quartile).
+  * A gold/amber (#FFD966) row background for the peer group's designated
+    benchmark company (`is_benchmark = 1` in `peer_groups`); the
+    percentile cells in that row retain their quartile colour so the
+    heatmap is still actionable.
+  * A "Peer Median" summary row at the bottom of each sheet with light-
+    grey fill, bold italic font, the median raw value for each metric,
+    and a fixed 50% percentile rank.
+
+Styling uses a navy header bar with white bold text, thin grey borders,
+frozen panes at `C3` (identity columns + header stay visible when
+scrolling), auto-sized columns, 12-character widths for value columns
+and 8-character widths for percentile columns, and a 13pt navy title
+row naming the sheet, fiscal year, and company count.
+
+Added `scripts/day20_peer_report.py` as the CLI entry point with
+`--year` and `--output` flags. Added 11 new unit tests in
+`tests/visuals/test_peer_report.py` covering the 20-metric registry,
+dataset shape (54 companies × 11 groups × 42 columns), percentile-in-
+[0,1] bounds, sheet count/naming, column count, title presence,
+presence of green/yellow/red percentile fills in every sheet, gold
+benchmark highlighting (verified for TCS in IT Services), and the Peer
+Median summary row (50% in every percentile column, grey fill, correct
+label).
+
+**Final score: 625/625 tests passing** (614 prior + 11 new), Black &
+Ruff clean. `output/peer_comparison.xlsx` written with 11 sheets × 42
+columns × 54 companies.

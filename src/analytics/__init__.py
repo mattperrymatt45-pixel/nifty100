@@ -10,6 +10,7 @@ Modules:
     composite      - Composite Quality Score 0-100, sector-relative (Sprint 3 Day 17).
     peer           - Peer-group percentile rankings for 10 KPIs (Sprint 3 Day 18).
     radar_charts   - 8-axis polar radar charts per company vs peer group (Sprint 3 Day 19).
+    peer_report    - Peer-comparison Excel report, 11 sheets, quartile colouring (Sprint 3 Day 20).
 """
 
 from src.analytics.cagr import (
@@ -93,6 +94,15 @@ from src.analytics.peer import (
     ensure_schema,
     peer_percentile_for_company,
     populate_peer_percentiles,
+)
+from src.analytics.peer_report import (
+    OUTPUT_PATH as PEER_REPORT_OUTPUT_PATH,
+)
+from src.analytics.peer_report import (
+    REPORT_METRICS,
+    ReportMetric,
+    generate_peer_report,
+    load_peer_report_dataset,
 )
 from src.analytics.radar_charts import (
     RadarData,
@@ -186,10 +196,12 @@ __all__ = [
     "PB_EXPENSIVE",
     "PB_FAIR_UPPER",
     "PEER_METRICS",
+    "PEER_REPORT_OUTPUT_PATH",
     "PE_CHEAP",
     "PE_EXPENSIVE",
     "PE_FAIR_LOWER",
     "PE_FAIR_UPPER",
+    "REPORT_METRICS",
     "ROCE_DELTA_THRESHOLD_PP",
     "ROE_DELTA_THRESHOLD_PP",
     "VALID_FLAGS",
@@ -213,6 +225,7 @@ __all__ = [
     "ProfitabilityRatios",
     "ROCEAnomaly",
     "RadarData",
+    "ReportMetric",
     "ValuationCheck",
     "ValuationRatios",
     "asset_turnover",
@@ -248,6 +261,7 @@ __all__ = [
     "fcf_yield",
     "format_anomaly_log",
     "free_cash_flow",
+    "generate_peer_report",
     "generate_radar_charts",
     "high_leverage_flag",
     "icr_display_label",
@@ -255,6 +269,7 @@ __all__ = [
     "interest_coverage_ratio",
     "is_bank_nfc_insurance",
     "is_financial_sector",
+    "load_peer_report_dataset",
     "net_debt",
     "net_profit_margin",
     "operating_profit_margin",
