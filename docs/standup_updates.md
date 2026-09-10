@@ -516,3 +516,117 @@ label).
 **Final score: 625/625 tests passing** (614 prior + 11 new), Black &
 Ruff clean. `output/peer_comparison.xlsx` written with 11 sheets × 42
 columns × 54 companies.
+
+## Day 21 — Sprint 3 Review & Retrospective (Sprint 3)
+
+**Test sweep.** Expanded `tests/dq/test_rules.py` from 5 hand-picked tests
+to a full 48-test suite covering DQ-01 through DQ-14 (one test class per
+rule with a positive and at least one negative case, plus parametrised
+edge cases for tax-rate / dividend-payout ranges, URL validity, and
+ticker regex). All 14 spec-mandated DQ rules are now unit-tested: PK
+uniqueness on companies (DQ-01) and annual time-series (DQ-02), FK
+integrity (DQ-03), BS balance within ±1% (DQ-04), OPM vs computed
+(DQ-05), positive-sales with bank/NBFC carve-out (DQ-06), YYYY-MM year
+format (DQ-07), ticker regex (DQ-08), CFO+CFI+CFF ≈ net cash flow
+(DQ-09), non-negative fixed assets (DQ-10), tax-rate 0–60% (DQ-11),
+dividend payout ≤ 200% (DQ-12), http(s) URL syntax (DQ-13), and EPS sign
+consistency with PAT (DQ-14).
+
+**Manual verification — Quality Compounder preset (top 5):**
+
+| Ticker       | Company                          |  ROE % |  D/E  | Composite |
+|--------------|----------------------------------|-------:|------:|----------:|
+| COLPAL       | Colgate Palmolive (India) Ltd    |  23.03 | 0.054 |     88.65 |
+| GODREJCP     | Godrej Consumer Products Ltd     |  23.92 | 0.215 |     84.58 |
+| ASIANPAINT   | Asian Paints Ltd                 |  17.14 | 0.162 |     79.23 |
+| TITAN        | Titan Company Ltd                |  21.63 | 0.304 |     78.99 |
+| HEROMOTOCO   | Hero MotoCorp Ltd                |  22.30 | 0.342 |     77.26 |
+
+All 32 constituents have ROE > 15% (min 15.01%) and D/E < 1 (max 0.943)
+— preset invariants verified programmatically.
+
+**Peer ranking spot-check (IT Services):**
+HCLTECH has the highest ROE (23.09) and correctly holds the highest ROE
+percentile rank (1.000); TCS (16.75, 0.750), INFY (15.82, 0.500),
+LTIM (13.54, 0.250), TECHM (12.55, 0.000) follow in strict order.
+
+**Peer ranking spot-check (FMCG):**
+NESTLEIND has highest ROE (31.26) and top percentile (1.000);
+HINDUNILVR, TATACONSUM, ITC, GODREJCP, BRITANNIA, DABUR follow in
+correct monotonic order through to 0.000 — no ties, no inversion,
+PERCENT_RANK formula confirmed.
+
+**Preset counts (spec: 5–50 each):**
+  - Quality Compounder : 32 ✓
+  - Value Pick         :  5 ✓
+  - Growth Accelerator : 14 ✓
+  - Dividend Champion  : 32 ✓
+  - Debt-Free Blue Chip:  8 ✓
+  - Turnaround Watch   : 27 ✓
+
+**Deliverable inventory:**
+  - `output/screener_output.xlsx` — 7 sheets (Summary + 6 presets),
+    green/red threshold-coloured cells, 118 total rows.
+  - `output/peer_comparison.xlsx` — exactly 11 sheets (one per peer
+    group), quartile green/yellow/red percentile fills, gold benchmark
+    row, grey Peer Median summary.
+  - `reports/radar_charts/` — 89 PNGs (54 peer-radar + 35 standalone
+    bar charts for no-peer companies).
+  - `db/nifty100.db → peer_percentiles` — 540 rows populated for FY
+    2024-03 across 11 peer groups × 10 metrics.
+  - `config/screener_config.yaml` — analyst-editable YAML with all 6
+    presets, threshold defaults, and metric column mappings.
+  - `src/screener/engine.py` + `src/analytics/composite.py` — filter
+    engine, winzorised composite 0–100 score.
+  - `src/analytics/peer.py` — PERCENT_RANK peer-percentile engine.
+
+**Final score: 668/668 tests passing** (625 prior + 43 new DQ tests),
+Black & Ruff clean, zero lint warnings, 14/14 DQ rule unit tests green,
+all exit criteria satisfied.
+
+### Sprint 3 Retrospective
+
+**What went well**
+  - YAML-driven preset architecture meant adding the six spec presets
+    on Day 16 was a pure-data exercise — no engine changes needed once
+    the `eq` / `flag` directions and prior-year D/E lookup were added.
+  - The PERCENT_RANK helper from Day 18 was reused verbatim by radar
+    charts (Day 19) and peer report (Day 20) — a single source of
+    truth for peer rankings across three deliverables.
+  - Frozen-dataclass Settings + defensive prod-DB fixture pattern from
+    Day 17 eliminated a whole class of test-pollution bugs; no flaky
+    test after the fix.
+  - Matplotlib polar-radar PNGs rendered headlessly with Agg backend
+    and matched the visual spec (filled blue polygon, dashed red peer
+    overlay, readable fonts, soft-blue background) on first try.
+
+**What was harder than expected**
+  - Market-cap column aliasing (`market_cap_crore` not `market_cap_cr`,
+    `free_cash_flow_cr` vs aliased `fcf_cr`) caused two silent
+    NULL-joins before standardising on a single column-map.
+  - SQLite does not allow `datetime('utc')` as a column DEFAULT in all
+    builds — `computed_at` had to be stamped client-side.
+  - `to_sql(if_exists='append')` does not invoke column DEFAULTs, so
+    every audit timestamp had to be applied pre-insert, not via
+    schema.
+  - Test pollution from `object.__setattr__` on the frozen Settings
+    singleton cascaded across three test modules until the root cause
+    was found.
+
+**Lessons carried into Sprint 4 (Dashboard / API)**
+  - Use the prod-DB fixture pattern (env var + object.__setattr__ +
+    explicit db_path) everywhere a test hits production data.
+  - Standardise all column aliases to the canonical DB names the
+    moment a new table is added, before writing analytics modules.
+  - Keep colour constants and visual style tokens in a single module
+    so Excel fills and matplotlib colours stay aligned.
+  - Register the voice / chart / report scripts as CLI entry points
+    with argparse flags so they are usable by analysts outside the
+    test harness.
+
+**Sign-off:** Sprint 3 exit criteria all met — six preset screeners
+return 5–50 companies each, peer_comparison.xlsx has exactly 11
+sheets, IT Services and FMCG peer rankings verified correct, all 14
+DQ rule unit tests pass, 668 total tests green. Demo of
+screener_output.xlsx and peer_comparison.xlsx completed. Sprint 3
+review **signed off**.
