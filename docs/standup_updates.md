@@ -746,3 +746,55 @@ server log after rendering the Home screen.
 
 **Final score: 722/722 tests passing** (711 prior + 11 new), Black &
 Ruff clean.
+
+## Day 24 - Screener Screen & Peer Comparison Screen (Sprint 4)
+
+Built the Screener and Peer Comparison screens.
+
+**Screener (03_screener.py):**
+  * **10 sidebar metric sliders** - ROE min, D/E max, FCF min, Revenue CAGR 5y
+    min, PAT CAGR 5y min, OPM min, P/E max, P/B max, Dividend Yield min,
+    ICR min. Sliders re-render the results table on every change (live).
+  * **6 preset buttons** - Quality, Value, Growth, Dividend, Debt-Free,
+    Turnaround. Each button writes preset thresholds into `st.session_state`
+    and calls `st.rerun()`, which causes all sliders to snap to the preset
+    values and the results table to update accordingly.
+  * **Live results table** - Ticker, Company, Sector, Composite score plus
+    every filtered metric (ROE %, D/E, FCF Cr, Rev/PAT CAGR 5y %, OPM %,
+    P/E, P/B, Div Yield %, ICR), sorted by composite score descending.
+  * **Result-count label** - "N companies match your filters" shown above
+    the table. When zero companies match a friendly warning is shown.
+  * **CSV download button** - emits a well-formed UTF-8 CSV containing all
+    visible columns.
+  * New `get_screener_dataset()` helper in `db.py` joins the full latest-FY
+    panel (financial_ratios + companies + sectors + peer_groups + market_cap
+    + profitandloss) including `fcf_positive` boolean and `sales` for preset
+    alignment.
+
+**Peer Comparison (04_peers.py):**
+  * **Peer-group dropdown** listing all 11 groups.
+  * **Per-company selector** within the chosen group (defaults to the
+    `is_benchmark=1` company when present).
+  * **Plotly Scatterpolar radar chart** with 8 axes (ROE, ROCE, NPM, D/E
+    inverted, CFO/PAT, PAT CAGR 5y, Rev CAGR 5y, Composite) comparing the
+    selected company (filled blue polygon #1F77B4, alpha 0.22) against the
+    peer-group average (dashed red #FF4B4B outline). Percentiles are
+    computed with the same SQL-style PERCENT_RANK formula from Day 18 so
+    the dashboard radar is identical to the Day-19 PNG charts.
+  * **Side-by-side KPI table** with 12 metrics for every group member; the
+    benchmark row is highlighted with a gold `#FFD966` background + bold
+    text and a ★ marker, using pandas `Styler.apply`.
+  * New helper `get_peer_averages(group_name)` added to `db.py` for future
+    reuse.
+
+Added 8 new tests covering: screener dataset shape (89 rows × all required
+columns including `fcf_positive`), Quality preset result count 25-40 (matches
+engine output), CSV download returns UTF-8 bytes with header, PERCENT_RANK
+semantics (best=1/worst=0/inverted/NaN=0.5), peers query returns all radar
+columns, and radar figure construction returns two Scatterpolar traces
+(company + peer avg).
+
+**Verified:** `streamlit run` starts cleanly, `/` returns HTTP 200,
+`/_stcore/health` returns "ok", no tracebacks in log.
+
+**Final score: 730/730 tests passing** (722 prior + 8 new), Black & Ruff clean.

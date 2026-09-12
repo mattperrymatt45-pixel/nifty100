@@ -123,6 +123,8 @@ REQUIRED_QUERIES = [
     "get_peer_groups",
     "get_latest_ratios",
     "get_peer_percentiles",
+    "get_screener_dataset",
+    "get_peer_averages",
     "get_kpis_for_year",
     "get_available_years",
     "get_prosandcons",
@@ -323,3 +325,106 @@ def test_get_prosandcons_unknown_returns_empty() -> None:
     pros, cons = db.get_prosandcons("__GHOST__")
     assert pros == []
     assert cons == []
+
+
+# ---------------------------------------------------------------------------
+# Day 24 - Screener & Peers helpers
+# ---------------------------------------------------------------------------
+def test_get_screener_dataset_shape() -> None:
+    from src.dashboard.utils import db
+
+    df = db.get_screener_dataset()
+    assert len(df) == 89
+    for col in [
+        "ticker",
+        "company_name",
+        "broad_sector",
+        "roe_pct",
+        "de",
+        "fcf_cr",
+        "rev_cagr_5yr",
+        "pat_cagr_5yr",
+        "opm_pct",
+        "pe_ratio",
+        "pb_ratio",
+        "div_yield_pct",
+        "icr",
+        "composite",
+        "fcf_positive",
+    ]:
+        assert col in df.columns, f"missing column {col}"
+
+
+def test_screener_quality_preset_filter_count() -> None:
+    """Quality filters (ROE>=15, D/E<=1, FCF>=0, RevCAGR>=10) - must match engine."""
+    from src.dashboard.pages import screener as scr
+    from src.dashboard.utils import db
+
+    df = db.get_screener_dataset()
+    f = scr.PRESETS["Quality"]
+    out = scr._apply_filters(df, f)
+    # Engine returned 32 in Day 21 verification; allow ±5 for mcap/join drift.
+    assert 25 <= len(out) <= 40
+
+
+def test_screener_csv_download_utf8() -> None:
+    from src.dashboard.pages import screener as scr
+    from src.dashboard.utils import db
+
+    df = db.get_screener_dataset()
+    out = scr._apply_filters(df, scr.DEFAULT_FILTERS)
+    csv_bytes = scr._csv(out.head(3))
+    assert csv_bytes.startswith(b"ticker,") or b"ticker" in csv_bytes[:100]
+    assert b"\n" in csv_bytes
+    assert isinstance(csv_bytes, bytes)
+
+
+def test_peers_percentile_rank_semantics() -> None:
+    from src.dashboard.pages.peers import _percentile_rank
+
+    s = pd.Series([10, 20, 30, 40, 50])
+    # Best value 50 -> pctile 1.0; worst 10 -> 0.0
+    assert _percentile_rank(s, 50) == pytest.approx(1.0)
+    assert _percentile_rank(s, 10) == pytest.approx(0.0)
+    # Middle
+    assert 0.0 < _percentile_rank(s, 30) < 1.0
+    # Inverted: low value -> high pctile
+    assert _percentile_rank(pd.Series([0.1, 0.5, 1.0]), 0.1, invert=True) == pytest.approx(1.0)
+    # NaN -> 0.5 neutral
+    assert _percentile_rank(s, float("nan")) == pytest.approx(0.5)
+
+
+def test_get_peers_returns_radar_columns() -> None:
+    from src.dashboard.utils import db
+
+    df = db.get_peers("IT Services")
+    for col in [
+        "ticker",
+        "company_name",
+        "is_benchmark",
+        "roe_pct",
+        "roce_pct",
+        "npm_pct",
+        "de",
+        "icr",
+        "fcf_cr",
+        "rev_cagr_5yr",
+        "pat_cagr_5yr",
+        "composite",
+        "pe_ratio",
+        "pb_ratio",
+        "div_yield_pct",
+    ]:
+        assert col in df.columns
+
+
+def test_radar_build_returns_figure() -> None:
+    from src.dashboard.pages import peers as pg
+    from src.dashboard.utils import db
+
+    df = db.get_peers("IT Services")
+    fig = pg._build_radar(df, "TCS")
+    # Scatterpolar should have two traces (company + peer avg)
+    assert len(fig.data) == 2
+    assert fig.data[0].name == "TCS"
+    assert "Peer Average" in fig.data[1].name

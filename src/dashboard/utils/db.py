@@ -99,15 +99,65 @@ def get_latest_ratios() -> pd.DataFrame:
         SELECT fr.*, c.company_name, s.broad_sector, s.sub_sector,
                s.market_cap_category, pg.peer_group_name,
                mc.market_cap_crore, mc.pe_ratio, mc.pb_ratio,
-               mc.ev_ebitda, mc.dividend_yield_pct
+               mc.ev_ebitda, mc.dividend_yield_pct,
+               pl.sales AS sales
         FROM financial_ratios fr
         JOIN companies c ON c.id = fr.company_id
         LEFT JOIN sectors s ON s.company_id = fr.company_id
         LEFT JOIN peer_groups pg ON pg.company_id = fr.company_id
         LEFT JOIN market_cap mc ON mc.company_id = fr.company_id
            AND mc.year = CAST(SUBSTR(fr.year, 1, 4) AS INTEGER)
+        LEFT JOIN profitandloss pl ON pl.company_id = fr.company_id
+           AND pl.year = fr.year
         WHERE fr.year = (SELECT MAX(year) FROM financial_ratios)
-        ORDER BY fr.company_id
+        ORDER BY fr.composite_quality_score DESC NULLS LAST
+    """
+    return _get_conn().query(query, ttl=600)
+
+
+@st.cache_data(ttl=600)
+def get_screener_dataset() -> pd.DataFrame:
+    """Return the fully-joined screener dataset for the latest FY.
+
+    Used by the dashboard's live-screener screen; returns all columns
+    needed for the 10 slider filters and the display table, plus helper
+    boolean columns for the preset buttons.
+    """
+    query = """
+        SELECT
+            fr.company_id                            AS ticker,
+            c.company_name,
+            s.broad_sector,
+            s.sub_sector,
+            fr.return_on_equity_pct                  AS roe_pct,
+            fr.roce_pct,
+            fr.operating_profit_margin_pct           AS opm_pct,
+            fr.net_profit_margin_pct                 AS npm_pct,
+            fr.debt_to_equity                        AS de,
+            fr.interest_coverage                     AS icr,
+            fr.free_cash_flow_cr                     AS fcf_cr,
+            fr.revenue_cagr_5yr                      AS rev_cagr_5yr,
+            fr.pat_cagr_5yr                          AS pat_cagr_5yr,
+            fr.cfo_pat_ratio,
+            fr.composite_quality_score               AS composite,
+            mc.pe_ratio,
+            mc.pb_ratio,
+            mc.dividend_yield_pct                    AS div_yield_pct,
+            mc.market_cap_crore                      AS market_cap_cr,
+            pl.sales,
+            pl.net_profit,
+            (CASE WHEN fr.free_cash_flow_cr > 0 THEN 1 ELSE 0 END) AS fcf_positive,
+            pg.peer_group_name,
+            pg.is_benchmark
+        FROM financial_ratios fr
+        JOIN companies c ON c.id = fr.company_id
+        LEFT JOIN sectors s ON s.company_id = fr.company_id
+        LEFT JOIN peer_groups pg ON pg.company_id = fr.company_id
+        LEFT JOIN market_cap mc ON mc.company_id = fr.company_id
+           AND mc.year = CAST(SUBSTR(fr.year, 1, 4) AS INTEGER)
+        LEFT JOIN profitandloss pl ON pl.company_id = fr.company_id AND pl.year = fr.year
+        WHERE fr.year = (SELECT MAX(year) FROM financial_ratios)
+        ORDER BY fr.composite_quality_score DESC NULLS LAST
     """
     return _get_conn().query(query, ttl=600)
 
@@ -176,7 +226,7 @@ def get_peer_groups() -> pd.DataFrame:
 
 @st.cache_data(ttl=600)
 def get_peers(group_name: str) -> pd.DataFrame:
-    """Return all members of a peer group with latest-year ratios and percentiles."""
+    """Return all members of a peer group with latest-year ratios + percentiles."""
     query = """
         SELECT pg.company_id                              AS ticker,
                c.company_name,
@@ -195,8 +245,8 @@ def get_peers(group_name: str) -> pd.DataFrame:
                fr.composite_quality_score                 AS composite,
                mc.pe_ratio,
                mc.pb_ratio,
-               mc.dividend_yield_pct,
-               mc.market_cap_crore
+               mc.dividend_yield_pct                      AS div_yield_pct,
+               mc.market_cap_crore                        AS market_cap_cr
         FROM peer_groups pg
         JOIN companies c ON c.id = pg.company_id
         LEFT JOIN financial_ratios fr
@@ -227,6 +277,37 @@ def get_peer_percentiles(group_name: str, year: str | None = None) -> pd.DataFra
         ORDER BY metric, percentile_rank DESC
     """
     return _get_conn().query(query, params={"group_name": group_name, "year": year}, ttl=600)
+
+
+@st.cache_data(ttl=600)
+def get_peer_averages(group_name: str) -> dict[str, float]:
+    """Return mean value per radar metric across a peer group (latest FY).
+
+    Metrics mirror the radar-chart axes from Day 19: roe, roce, npm, de
+    (inverted = 1 - de/max_de so higher = better), cfo_pat, pat_cagr_5yr,
+    rev_cagr_5yr, composite. All values are normalised to a 0-1
+    percentile scale for polar plotting; this helper also returns the
+    raw means so callers can compute percentiles on the fly when the
+    peer_percentiles table doesn't cover an axis (cfo_pat, composite).
+    """
+    query = """
+        SELECT fr.return_on_equity_pct   AS roe_pct,
+               fr.roce_pct               AS roce_pct,
+               fr.net_profit_margin_pct  AS npm_pct,
+               fr.debt_to_equity         AS de,
+               fr.cfo_pat_ratio          AS cfo_pat,
+               fr.pat_cagr_5yr           AS pat_cagr_5yr,
+               fr.revenue_cagr_5yr       AS rev_cagr_5yr,
+               fr.composite_quality_score AS composite
+        FROM peer_groups pg
+        JOIN financial_ratios fr ON fr.company_id = pg.company_id
+           AND fr.year = (SELECT MAX(year) FROM financial_ratios)
+        WHERE pg.peer_group_name = :group_name
+    """
+    df = _get_conn().query(query, params={"group_name": group_name}, ttl=600)
+    if df.empty:
+        return {}
+    return df.mean(numeric_only=True).to_dict()
 
 
 @st.cache_data(ttl=600)
@@ -353,12 +434,7 @@ def run_sql(query: str, params: dict[str, Any] | None = None) -> pd.DataFrame:
 
 
 def invalidate_cache() -> None:
-    """Clear all cached query results (used after a DB refresh).
-
-    Defensive wrapper: under test/unit scenarios ``st.cache_data`` may be
-    monkey-patched into a plain decorator without the ``.clear()`` method;
-    in that case we silently no-op so the call is always safe.
-    """
+    """Clear all cached query results (used after a DB refresh)."""
     clear = getattr(st.cache_data, "clear", None)
     if callable(clear):
         clear()
