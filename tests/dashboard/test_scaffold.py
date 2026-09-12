@@ -129,6 +129,8 @@ REQUIRED_QUERIES = [
     "get_available_years",
     "get_prosandcons",
     "get_company_about",
+    "get_full_ratios_with_pl",
+    "get_documents",
     "run_sql",
     "invalidate_cache",
 ]
@@ -428,3 +430,68 @@ def test_radar_build_returns_figure() -> None:
     assert len(fig.data) == 2
     assert fig.data[0].name == "TCS"
     assert "Peer Average" in fig.data[1].name
+
+
+# ---------------------------------------------------------------------------
+# Day 25 helpers - full panel, documents, trend/treemap plumbing
+# ---------------------------------------------------------------------------
+def test_get_full_ratios_with_pl_panel() -> None:
+    from src.dashboard.utils import db
+
+    df = db.get_full_ratios_with_pl()
+    # Panel should span many rows (company x year) with sales + market cap joined.
+    assert len(df) >= 1000
+    for col in [
+        "company_id",
+        "year",
+        "sales",
+        "net_profit",
+        "return_on_equity_pct",
+        "market_cap_crore",
+        "capital_allocation_pattern",
+    ]:
+        assert col in df.columns
+
+
+def test_get_documents_tcs() -> None:
+    from src.dashboard.utils import db
+
+    df = db.get_documents("TCS")
+    assert len(df) >= 5
+    assert "year" in df.columns and "url" in df.columns
+
+
+def test_get_documents_unknown_empty() -> None:
+    from src.dashboard.utils import db
+
+    df = db.get_documents("__GHOST__")
+    assert df.empty
+
+
+def test_page_modules_have_required_metrics_dict() -> None:
+    """Trends page must expose a METRICS dict mapping labels to columns."""
+    from src.dashboard.pages import trends
+
+    assert isinstance(trends.METRICS, dict)
+    assert len(trends.METRICS) >= 8
+    assert "Revenue (Cr)" in trends.METRICS
+
+
+def test_capital_pattern_colors_cover_eight_patterns() -> None:
+    from src.dashboard.pages import capital
+
+    # We expect at least the four patterns produced by the production DB,
+    # plus a colour for Mixed and the synthetic root.
+    assert "Reinvestor" in capital.PATTERN_COLORS
+    assert "Shareholder Returns" in capital.PATTERN_COLORS
+    assert "Mixed" in capital.PATTERN_COLORS
+
+
+def test_reports_url_check_rejects_missing_path() -> None:
+    from src.dashboard.pages import reports
+
+    ok, msg = reports._check_url("https://www.bseindia.com/missing/TCS.pdf")
+    assert ok is False
+    assert "missing" in msg
+    ok2, _ = reports._check_url("")
+    assert ok2 is False

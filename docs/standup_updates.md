@@ -798,3 +798,67 @@ columns, and radar figure construction returns two Scatterpolar traces
 `/_stcore/health` returns "ok", no tracebacks in log.
 
 **Final score: 730/730 tests passing** (722 prior + 8 new), Black & Ruff clean.
+
+## Day 25 - Remaining 4 Screens (Sprint 4)
+
+Completed the last four dashboard screens.
+
+**Trend Analysis (05_trends.py):**
+  * Company search box + **multi-metric selector** (10 metrics: Revenue, Net
+    Profit, ROE, ROCE, OPM, NPM, D/E, FCF, ICR, EPS) supporting up to 3
+    overlaid metrics.
+  * **10-year Plotly dual-Y line chart** with lines+markers. The first
+    selected metric goes on the left axis, second metric on a right axis
+    (independent scales prevent Revenue Cr from crushing margin %).
+  * **YoY % change annotations** rendered in bold at the last data point of
+    each series, using that metric's colour (e.g. "+12%").
+  * Expandable data table underneath.
+
+**Sector Analysis (06_sectors.py):**
+  * Sector dropdown with "All sectors" option.
+  * **Plotly scatter bubble chart** - X=Revenue (log scale), Y=ROE %,
+    bubble size=Market Cap, colour=sub-sector (or broad sector in all-
+    sectors view), with custom hover text showing Ticker, Revenue, ROE,
+    Market Cap.
+  * **Median KPI horizontal bar chart** below: when "All sectors" is
+    picked the user chooses a KPI and sees it ranked across sectors;
+    when a specific sector is picked all 7 KPIs are shown as a sorted
+    horizontal bar chart for that sector.
+  * Expandable constituent table.
+
+**Capital Allocation Map (07_capital.py):**
+  * **Plotly treemap** grouping all ~89 latest-FY companies by capital-
+    allocation pattern (Reinvestor, Shareholder Returns, Growth Funded
+    by Debt, Mixed) using a synthetic "All Companies" root node. Tile
+    size = market cap; colour follows the project palette (green =
+    Reinvestor, blue = Shareholder Returns, magenta = Growth Funded by
+    Debt, olive = Mixed).
+  * Pattern-breakdown KPI tiles with coloured left-borders showing the
+    company count per pattern.
+  * Dropdown selector that lists all constituent companies of a chosen
+    pattern sorted by composite score.
+
+**Annual Reports / Downloads (08_reports.py):**
+  * Company search box.
+  * **Annual report rows** - each FY shows either a green clickable
+    "Open {year} Annual Report PDF" link (target=_blank) when the URL
+    passes a 4-second lightweight HEAD check, or a red "Report
+    unavailable" badge when the URL returns 404, is unreachable, or is
+    flagged as `/missing/` in the source data (defensive: does not
+    download the whole PDF). Results are cached for 30 minutes
+    (`ttl=1800`).
+  * **Project artifacts section** with download buttons for
+    `screener_output.xlsx` and `peer_comparison.xlsx`.
+
+**DB helpers added**: `get_full_ratios_with_pl()` (full company × year
+panel joined to P&L, market-cap and sectors - 1,100+ rows), `get_documents(ticker)`.
+
+Added 8 new tests covering full panel shape + required columns, documents
+for TCS (≥5 rows) and unknown ticker (empty), trends METRICS dict ≥ 8
+entries including Revenue, capital pattern color constants, and URL
+check behavior (rejects `/missing/` paths and empty URLs).
+
+**Verified:** `streamlit run` starts cleanly, `/_stcore/health` returns
+"ok", zero tracebacks in server log after initial page render.
+
+**Final score: 738/738 tests passing** (730 prior + 8 new), Black & Ruff clean.

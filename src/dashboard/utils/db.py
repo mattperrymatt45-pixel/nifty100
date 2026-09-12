@@ -428,6 +428,40 @@ def get_company_about(ticker: str) -> dict:
 
 
 @st.cache_data(ttl=600)
+def get_full_ratios_with_pl() -> pd.DataFrame:
+    """Return full (company, year) panel joined to sales/net_profit/mcap
+    for trend and sector screens.
+    """
+    query = """
+        SELECT fr.*, c.company_name, s.broad_sector, s.sub_sector,
+               s.market_cap_category,
+               pl.sales, pl.net_profit, pl.operating_profit,
+               mc.market_cap_crore, mc.pe_ratio, mc.pb_ratio,
+               mc.ev_ebitda, mc.dividend_yield_pct
+        FROM financial_ratios fr
+        JOIN companies c ON c.id = fr.company_id
+        LEFT JOIN sectors s ON s.company_id = fr.company_id
+        LEFT JOIN profitandloss pl ON pl.company_id = fr.company_id AND pl.year = fr.year
+        LEFT JOIN market_cap mc ON mc.company_id = fr.company_id
+           AND mc.year = CAST(SUBSTR(fr.year, 1, 4) AS INTEGER)
+        ORDER BY fr.company_id, fr.year
+    """
+    return _get_conn().query(query, ttl=600)
+
+
+@st.cache_data(ttl=600)
+def get_documents(ticker: str) -> pd.DataFrame:
+    """Return annual-report rows for ``ticker``, most recent first."""
+    query = """
+        SELECT Year AS year, Annual_Report AS url
+        FROM documents
+        WHERE company_id = :ticker
+        ORDER BY Year DESC
+    """
+    return _get_conn().query(query, params={"ticker": ticker}, ttl=600)
+
+
+@st.cache_data(ttl=600)
 def run_sql(query: str, params: dict[str, Any] | None = None) -> pd.DataFrame:
     """Escape hatch - run arbitrary read-only SQL (used by the Trends screen)."""
     return _get_conn().query(query, params=params or {}, ttl=600)
