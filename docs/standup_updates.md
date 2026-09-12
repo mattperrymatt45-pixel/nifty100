@@ -862,3 +862,60 @@ check behavior (rejects `/missing/` paths and empty URLs).
 "ok", zero tracebacks in server log after initial page render.
 
 **Final score: 738/738 tests passing** (730 prior + 8 new), Black & Ruff clean.
+
+## Day 26 - Valuation Module (Sprint 4)
+
+Extended `src/analytics/valuation.py` with a sector-relative valuation
+engine, and shipped the Day-26 valuation deliverables.
+
+**Engine additions in `src/analytics/valuation.py`:**
+  * `load_valuation_panel(conn, year)` — joins market_cap to
+    financial_ratios, companies, sectors, profitandloss (for net_profit
+    and EBIT) and balancesheet (equity+reserves = book value) for the
+    specified calendar year (default = latest year in market_cap).
+  * 5-year median P/E computed in-pandas (SQLite lacks MEDIAN()) over
+    the trailing 5-year window from market_cap, grouped by company.
+  * **FCF yield** = `free_cash_flow_cr / market_cap_crore × 100`.
+  * **Sector median P/E** computed per broad_sector from positive-P/E
+    rows (loss-makers excluded so they don't pull the median down).
+  * **Flag logic:** P/E > sector_median × 1.5 → **Caution**; P/E <
+    sector_median × 0.7 → **Discount**; otherwise **Fair**. Loss-makers
+    (PE ≤ 0 / NaN) default to Fair (insufficient data).
+  * `write_valuation_outputs()` — styles `valuation_summary.xlsx` with
+    the project's navy header fill + white bold text, and colour-codes
+    the flag column: red (#FFC7CE) Caution, green (#C6EFCE) Discount,
+    yellow (#FFEB9C) Fair. Auto-sized columns, frozen header row.
+  * `valuation_flags.csv` — contains only Caution / Discount rows with
+    supporting data.
+  * Top-level `run_valuation_module()` returns
+    `(summary_df, flagged_df, xlsx_path, csv_path)`.
+
+**CLI entry point `scripts/day26_valuation.py`:**
+Runs the engine against the production DB and prints the first 10 rows
+plus flag distribution. Accepts `--db-path`, `--output-dir`, `--year`.
+
+**Results on production DB (FY 2024-03 / CY 2024):**
+  * 89 companies processed
+  * Caution = 11, Discount = 26, Fair = 52
+  * Sample Caution: ADANIPORTS (P/E 27.98 vs Industrials median 18.13 =
+    154%), COLPAL (P/E 42.80 vs Staples median 24.89 = 172%), CIPLA
+    (P/E 43.05 vs Healthcare 26.80 = 161%)
+  * Sample Discount: APOLLOHOSP (P/E 8.57 vs Healthcare 26.80 = 32%),
+    ADANIPOWER (10.24 vs Energy 22.19 = 46%), COALINDIA (10.91 vs
+    Energy 22.19 = 49%)
+
+**Deliverables produced:**
+  * `output/valuation_summary.xlsx` — 89 rows × 11 columns with colour-
+    coded flag cells
+  * `output/valuation_flags.csv` — 37 flagged companies
+
+Added 13 new tests covering FCF-yield primitives, panel coverage
+(89 rows, all required columns), summary column contract, FCF-yield
+formula correctness (spot-checked), flag distribution sanity, synthetic
+3-company test verifying exact Caution/Discount/Fair thresholds, loss-
+maker default-to-Fair behaviour, 5yr-median presence, XLSX/CSV file
+creation (size, headers, CSV-only-flagged), and end-to-end
+`run_valuation_module` against prod DB.
+
+**Final score: 751/751 tests passing** (738 prior + 13 new), Black & Ruff
+clean.
