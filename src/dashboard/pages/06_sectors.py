@@ -45,7 +45,7 @@ def render() -> None:
         color=color_col,
         hover_name="company_name",
         hover_data={
-            "ticker": True,
+            "company_id": True,
             "Revenue (Cr)": ":,.0f",
             "ROE %": ":.1f",
             "Market Cap (Cr)": ":,.0f",
@@ -128,7 +128,7 @@ def render() -> None:
     with st.expander("Constituent table"):
         show = sub[
             [
-                "ticker",
+                "company_id",
                 "company_name",
                 "broad_sector",
                 "sub_sector",

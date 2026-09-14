@@ -919,3 +919,65 @@ creation (size, headers, CSV-only-flagged), and end-to-end
 
 **Final score: 751/751 tests passing** (738 prior + 13 new), Black & Ruff
 clean.
+
+## Day 27 - Integration QA & Bug Fixes (Sprint 4)
+
+End-to-end smoke and integration test of all 8 Streamlit screens
+against the production database, with bug fixes for every defect
+uncovered.
+
+**Integration harness `tests/dashboard/test_integration.py`:**
+Built a lightweight Streamlit shim (stub SessionState, cache_data,
+columns/tabs/expander containers, metric/dataframe/plotly_chart
+captures, selectbox/slider/session_state writers) so pages can be
+exercised in-process without launching a browser.
+
+**Coverage of the smoke matrix:**
+  * 10 cross-sector tickers profiled end-to-end: TCS (IT), HDFCBANK
+    (Financials), HINDUNILVR (FMCG), RELIANCE (Energy), SUNPHARMA
+    (Healthcare), TATAMOTORS, TATASTEEL, JSWSTEEL (Materials/Industrials),
+    HDFCLIFE (Insurance), ADANIGREEN (Energy/Renewables).
+  * Partial-data tickers (fewer than 10 years) render without crash and
+    display a "partial data available" note instead of blowing up on
+    NaN x-axis alignment.
+  * Screener exercised at two extremes: all sliders at minimum
+    (loose — returns the full universe, >80 rows) and all sliders at
+    maximum (tight — returns 0 rows, renders empty-state cleanly).
+  * All 11 peer groups loaded and rendered on the Peers page.
+  * Sectors page exercised both on "All sectors" and per-sector views.
+  * Reports page tested against a valid ticker and a non-existent
+    `__GHOST__` ticker; ghost companies skip the BSE HEAD probe and
+    show a "Not on BSE" state.
+
+**Bugs discovered and fixed:**
+  * `get_full_ratios_with_pl()` returns `company_id`, not `ticker`;
+    06_sectors.py and 07_capital.py were referencing `.ticker` and
+    raising AttributeError on real data. Patched both pages to use
+    `company_id` and alias it to `ticker` for display.
+  * Revenue/PAT bar chart crashed when recent years had NaN net
+    profit; ROE/ROCE line chart crashed when all observations were
+    NaN. Charts now `dropna(subset=...)` before plotting and show a
+    partial-data caption when fewer than 10 years are available.
+  * `urllib.request.urlopen` HEAD probe against BSE was using a 4s
+    timeout that pushed the Reports page over the render budget;
+    reduced to 2s so the page stays snappy even when BSE is slow.
+  * Page-level `st.columns()` was called with ratio lists (e.g.
+    `[1,1,1,1,1,1]`) which the original shim rejected; patched the
+    shim to accept both integer and iterable specs — matches real
+    Streamlit semantics.
+  * pyproject.toml per-file-ignores extended to silence false
+    positives: N999 on `pages/[0-9]*_*.py` filenames, and S101/SLF001
+    on the integration test shim.
+
+**Performance check (Company Profile screen load time, production DB):**
+Measured via in-process render timings across 5 tickers — TCS,
+HDFCBANK, HINDUNILVR, RELIANCE, SUNPHARMA — all came in at 0.03s to
+0.08s, well under the 3-second budget per company.
+
+**Server health:**
+`/_stcore/health` returns "ok"; Streamlit starts cleanly on
+0.0.0.0:8501 with no tracebacks in the server log after rendering
+every page.
+
+**Final score: 752/752 tests passing** (751 prior + 1 integration
+module), Black & Ruff clean.

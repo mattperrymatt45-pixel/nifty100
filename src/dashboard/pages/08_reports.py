@@ -17,13 +17,13 @@ from src.dashboard.utils.db import get_companies, get_documents
 
 
 @st.cache_data(ttl=1800)
-def _check_url(url: str, timeout: int = 4) -> tuple[bool, str]:
+def _check_url(url: str, timeout: int = 2) -> tuple[bool, str]:
     """Return (reachable, status-text) for the given URL.
 
     Checks for known bad substrings first (``missing`` paths, empty values),
-    then attempts a lightweight HEAD request with a short timeout. Network
-    failures or non-2xx/3xx responses return False so the UI can show the
-    red unavailable badge quickly.
+    then attempts a lightweight HEAD request with a 2-second timeout so the
+    page always renders quickly. Network failures or non-2xx/3xx responses
+    return False so the UI can show the red unavailable badge.
     """
     if not url or not isinstance(url, str) or not url.startswith("http"):
         return False, "invalid URL"
@@ -37,7 +37,7 @@ def _check_url(url: str, timeout: int = 4) -> tuple[bool, str]:
     except HTTPError as exc:
         return False, f"HTTP {exc.code}"
     except (URLError, TimeoutError, OSError, ValueError):
-        return False, "network unreachable"
+        return False, "unreachable (or slow)"
 
 
 def _select_ticker(companies: pd.DataFrame) -> str:

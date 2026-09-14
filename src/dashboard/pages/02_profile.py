@@ -100,11 +100,25 @@ def _kpi_tiles(latest: pd.Series) -> None:
 
 
 def _revenue_pat_chart(pl: pd.DataFrame) -> None:
-    """10-year grouped bar chart for Revenue (sales) and Net Profit."""
+    """10-year grouped bar chart for Revenue (sales) and Net Profit.
+
+    Rows with NaN sales/profit are dropped; if fewer than 10 years of
+    history exist an informational note is rendered above the chart.
+    """
     plot_df = pl.head(10).copy()  # already desc - head = most recent
     plot_df = plot_df.sort_values("year")
+    plot_df["sales"] = pd.to_numeric(plot_df["sales"], errors="coerce")
+    plot_df["net_profit"] = pd.to_numeric(plot_df["net_profit"], errors="coerce")
+    plot_df = plot_df.dropna(subset=["sales"])
+    if plot_df.empty:
+        st.info("No revenue history available for this company.")
+        return
+    if len(plot_df) < 10:
+        st.caption(
+            f"Note: only {len(plot_df)} year(s) of revenue history available " "(partial data)."
+        )
     plot_df["Revenue (Cr)"] = plot_df["sales"].astype(float)
-    plot_df["Net Profit (Cr)"] = plot_df["net_profit"].astype(float)
+    plot_df["Net Profit (Cr)"] = plot_df["net_profit"].fillna(0).astype(float)
 
     fig = go.Figure()
     fig.add_bar(
@@ -118,7 +132,7 @@ def _revenue_pat_chart(pl: pd.DataFrame) -> None:
     )
     fig.update_layout(
         barmode="group",
-        title="Revenue & Net Profit - last 10 years (Cr)",
+        title="Revenue & Net Profit (Cr)",
         xaxis_title="Financial Year",
         yaxis_title="Cr",
         height=400,
@@ -129,33 +143,37 @@ def _revenue_pat_chart(pl: pd.DataFrame) -> None:
 
 
 def _roe_roce_chart(ratios: pd.DataFrame) -> None:
-    """Dual-axis line chart: ROE and ROCE over time."""
+    """Dual-axis line chart: ROE and ROCE over time. NaN points are skipped."""
     plot_df = ratios.sort_values("year").copy()
-    plot_df = plot_df[pd.notna(plot_df["return_on_equity_pct"])]
+    for col in ("return_on_equity_pct", "roce_pct"):
+        plot_df[col] = pd.to_numeric(plot_df[col], errors="coerce")
+    plot_df = plot_df.dropna(subset=["return_on_equity_pct", "roce_pct"], how="all")
     if plot_df.empty:
         st.info("No ROE/ROCE history available for this company.")
         return
+    roe = plot_df["return_on_equity_pct"]
+    roce = plot_df["roce_pct"]
     fig = go.Figure()
-    fig.add_trace(
-        go.Scatter(
-            x=plot_df["year"],
-            y=plot_df["return_on_equity_pct"],
-            name="ROE %",
-            mode="lines+markers",
-            line=dict(color="#1F77B4", width=2.5),
-            yaxis="y",
+    if roe.notna().any():
+        fig.add_trace(
+            go.Scatter(
+                x=plot_df.loc[roe.notna(), "year"],
+                y=roe.dropna(),
+                name="ROE %",
+                mode="lines+markers",
+                line=dict(color="#1F77B4", width=2.5),
+            )
         )
-    )
-    fig.add_trace(
-        go.Scatter(
-            x=plot_df["year"],
-            y=plot_df["roce_pct"],
-            name="ROCE %",
-            mode="lines+markers",
-            line=dict(color="#FF4B4B", width=2.5, dash="dash"),
-            yaxis="y",
+    if roce.notna().any():
+        fig.add_trace(
+            go.Scatter(
+                x=plot_df.loc[roce.notna(), "year"],
+                y=roce.dropna(),
+                name="ROCE %",
+                mode="lines+markers",
+                line=dict(color="#FF4B4B", width=2.5, dash="dash"),
+            )
         )
-    )
     fig.update_layout(
         title="ROE & ROCE trend (%)",
         xaxis_title="Financial Year",

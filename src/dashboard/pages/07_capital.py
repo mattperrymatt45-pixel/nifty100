@@ -35,13 +35,13 @@ def render() -> None:
     latest_year = panel["year"].max()
     df = panel[panel["year"] == latest_year].copy()
     df["pattern"] = df["capital_allocation_pattern"].fillna("Mixed")
-    df["tile_label"] = df["ticker"]
+    df["ticker"] = df["company_id"]
 
     # Build treemap data: level 0 = pattern, level 1 = company
     treemap_df = df[
         [
             "pattern",
-            "ticker",
+            "company_id",
             "company_name",
             "fcf_cr",
             "cfo_pat_ratio",
@@ -52,9 +52,9 @@ def render() -> None:
     # Parent column: company rows point to their pattern
     treemap_df["parent"] = treemap_df["pattern"]
     # Pattern rows point to the synthetic root
-    pattern_summary = df.groupby("pattern").agg(count=("ticker", "count")).reset_index()
+    pattern_summary = df.groupby("pattern").agg(count=("company_id", "count")).reset_index()
     pattern_summary["parent"] = "All Companies"
-    pattern_summary["ticker"] = pattern_summary["pattern"]
+    pattern_summary["company_id"] = pattern_summary["pattern"]
     pattern_summary["company_name"] = pattern_summary["pattern"] + (
         " (" + pattern_summary["count"].astype(str) + " companies)"
     )
@@ -67,7 +67,7 @@ def render() -> None:
         [
             {
                 "pattern": "All Companies",
-                "ticker": "All Companies",
+                "company_id": "All Companies",
                 "company_name": f"All Companies ({len(df)} firms)",
                 "parent": "",
                 "fcf_cr": 0,
@@ -88,7 +88,7 @@ def render() -> None:
 
     fig = px.treemap(
         treemap_df,
-        path=["parent", "pattern", "ticker"],
+        path=["parent", "pattern", "company_id"],
         values="market_cap_crore",
         color="pattern",
         color_discrete_map=color_map,
@@ -129,7 +129,7 @@ def render() -> None:
     if pattern_choice != "(select a pattern)":
         members = df[df["pattern"] == pattern_choice][
             [
-                "ticker",
+                "company_id",
                 "company_name",
                 "broad_sector",
                 "fcf_cr",
