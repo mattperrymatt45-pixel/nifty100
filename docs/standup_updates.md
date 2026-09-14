@@ -1024,3 +1024,67 @@ testing commands, and the Sprint 4 retrospective summary.
 
 Tests re-gated: Black clean, Ruff clean, **752/752 tests passing**.
 Sprint 4 is officially signed off.
+
+## Day 29 - NLP: Analysis Text Parser (Sprint 5)
+
+Shipped the first NLP-module primitive: a regex-based parser for
+Screener.in's `data/raw/analysis.xlsx` export, which extracts
+compounded growth / CAGR / ROE figures from free-text cells and
+cross-validates them against the Ratio Engine.
+
+**Module added: `src/nlp/parser.py`**
+  * Public constants: `PARSE_REGEX` (compiled pattern per spec
+    `(\d+)\s*Years?:?\s*([\d.]+)%`), `METRIC_COLUMNS` (the four
+    target text columns: compounded_sales_growth,
+    compounded_profit_growth, stock_price_cagr, roe),
+    `CAGR_DIVERGENCE_THRESHOLD_PCT = 5.0`.
+  * `load_analysis_workbook(path)` — reads the Screener.in export
+    with `header=1` (real header is on spreadsheet row 2) and casts
+    metric columns to pandas StringDtype.
+  * `parse_analysis_text(text)` — returns all `(period_years,
+    value_pct)` tuples found in a cell; supports optional colon,
+    flexible whitespace, singular/plural "Year/Years", decimals,
+    and multiple matches per cell.
+  * `_parse_frame(df)` — long-form tidier producing columns
+    `company_id, metric_type, source_column, period_years,
+    value_pct, source_value` plus a failure DataFrame
+    (`company_id, metric_type, raw_text, reason`).
+  * `cross_validate_parsed(parsed, db_path, threshold)` — joins
+    parsed rows to each company's latest financial_ratios row via
+    `RATIO_MAPPINGS` (sales_cagr -> revenue_cagr_{N}yr, profit_cagr
+    -> pat_cagr_{N}yr, roe_avg -> return_on_equity_pct; stock_cagr
+    has no DB equivalent and is skipped); emits a row only when
+    |delta| > 5pp OR the DB value is missing/null/column-absent.
+  * `run_parser(...)` — end-to-end orchestrator writing three CSVs.
+
+**CLI script: `scripts/day29_nlp_parser.py`**
+Accepts `--analysis-path`, `--db-path`, `--output-dir`, `--threshold`.
+
+**Outputs produced:**
+  * `output/analysis_parsed.csv` — 80 rows (20 companies × 4 metric
+    cells), columns `company_id, metric_type, source_column,
+    period_years, value_pct, source_value`. Match rate 100% against
+    the shipped sample.
+  * `output/parse_failures.csv` — 0 rows (shipped workbook is
+    cleanly formatted).
+  * `output/analysis_divergences.csv` — 41 rows: 37 genuine >5pp
+    divergences and 4 `ratio_value_null` cases (TITAN/LTIM/DLF
+    missing revenue_cagr_10yr; INDIGO missing pat_cagr_5yr in
+    latest FY) — all queued for manual review.
+
+**Metric-type mapping (text column -> parsed metric_type):**
+  * compounded_sales_growth -> sales_cagr (revenue_cagr_Nyr)
+  * compounded_profit_growth -> profit_cagr (pat_cagr_Nyr)
+  * stock_price_cagr -> stock_cagr (market-derived, not in DB)
+  * roe -> roe_avg (validated against avg ROE)
+
+**Tests added: 26 new tests in `tests/nlp/test_parser.py`** covering
+regex edge cases (colon/no-colon, singular "Year", case-insensitive,
+extra whitespace, empty/None/garbage input, multiple matches per
+cell), workbook loading, full-parse invariants, period_years integer
+typing, cross-validation (stock_cagr skipped, synthetic perfect
+match returns zero divergences, synthetic 10pp gap flagged), and
+end-to-end CSV emission.
+
+**Final score: 778/778 tests passing** (752 prior + 26 new), Black &
+Ruff clean.
