@@ -289,7 +289,7 @@ def load_valuation_panel(
     # equity_cr is not a native column — compute it from balancesheet to stay safe.
     query = """
         SELECT
-            fr.company_id,
+            mc.company_id,
             c.company_name,
             s.broad_sector                                 AS sector,
             mc.pe_ratio,
@@ -302,7 +302,7 @@ def load_valuation_panel(
             pl.operating_profit                            AS ebit,
             (bs.equity_capital + bs.reserves)              AS book_value_cr
         FROM market_cap mc
-        JOIN financial_ratios fr
+        LEFT JOIN financial_ratios fr
             ON fr.company_id = mc.company_id
            AND fr.year = :fy
         JOIN companies c ON c.id = mc.company_id
@@ -312,6 +312,52 @@ def load_valuation_panel(
         WHERE mc.year = :year
     """
     df = pd.read_sql(query, conn, params={"year": year, "fy": fy})
+
+    # Fallback: companies missing FY ``fy`` in financial_ratios (e.g. late filers)
+    # should still appear in the output with NaN fundamentals rather than being
+    # dropped.  Pull their latest available financial_ratios / profitandloss /
+    # balancesheet rows so FCF / book-value / EBIT populate when possible.
+    missing_ids = df.loc[df["free_cash_flow_cr"].isna(), "company_id"].tolist()
+    if missing_ids:
+        placeholders = ",".join(["?"] * len(missing_ids))
+        latest_fy_q = f"""
+            SELECT company_id, MAX(year) AS latest_fy
+            FROM financial_ratios
+            WHERE company_id IN ({placeholders})
+            GROUP BY company_id
+        """
+        latest_fy = pd.read_sql(latest_fy_q, conn, params=missing_ids)
+        for _, row in latest_fy.iterrows():
+            cid, lfy = row["company_id"], row["latest_fy"]
+            fr = pd.read_sql(
+                "SELECT free_cash_flow_cr FROM financial_ratios " "WHERE company_id=? AND year=?",
+                conn,
+                params=[cid, lfy],
+            )
+            pl = pd.read_sql(
+                "SELECT net_profit, operating_profit AS ebit FROM profitandloss "
+                "WHERE company_id=? AND year=?",
+                conn,
+                params=[cid, lfy],
+            )
+            bs = pd.read_sql(
+                "SELECT (equity_capital + reserves) AS book_value_cr FROM balancesheet "
+                "WHERE company_id=? AND year=?",
+                conn,
+                params=[cid, lfy],
+            )
+            idx = df.index[df["company_id"] == cid]
+            if not idx.empty:
+                i = idx[0]
+                if not fr.empty and pd.notna(fr.iloc[0]["free_cash_flow_cr"]):
+                    df.at[i, "free_cash_flow_cr"] = fr.iloc[0]["free_cash_flow_cr"]
+                if not pl.empty:
+                    if pd.notna(pl.iloc[0]["net_profit"]):
+                        df.at[i, "net_profit"] = pl.iloc[0]["net_profit"]
+                    if pd.notna(pl.iloc[0]["ebit"]):
+                        df.at[i, "ebit"] = pl.iloc[0]["ebit"]
+                if not bs.empty and pd.notna(bs.iloc[0]["book_value_cr"]):
+                    df.at[i, "book_value_cr"] = bs.iloc[0]["book_value_cr"]
 
     # 5-year median P/E for each company across the market_cap window ending in ``year``.
     pe5_query = """

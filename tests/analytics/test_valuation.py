@@ -42,7 +42,7 @@ def test_fcf_yield_negative_fcf() -> None:
 # Panel shape
 # ---------------------------------------------------------------------------
 def test_panel_covers_all_latest_companies(panel: pd.DataFrame) -> None:
-    assert len(panel) == 89
+    assert len(panel) == 92
     for col in [
         "company_id",
         "company_name",
@@ -116,12 +116,12 @@ def test_negative_pe_defaults_to_fair(panel: pd.DataFrame) -> None:
 def test_fcf_yield_pct_stored(summary: pd.DataFrame) -> None:
     """fcf_yield_pct column must be present and non-null for most companies."""
     non_null = summary["fcf_yield_pct"].notna().sum()
-    assert non_null >= 80
+    assert non_null >= 89
 
 
 def test_5yr_median_pe_present(summary: pd.DataFrame) -> None:
     """5yr_median_PE should be populated for the vast majority."""
-    assert summary["5yr_median_PE"].notna().sum() >= 80
+    assert summary["5yr_median_PE"].notna().sum() >= 89
 
 
 # ---------------------------------------------------------------------------
@@ -151,7 +151,7 @@ def test_write_outputs_creates_xlsx_and_csv(tmp_path: Path, summary: pd.DataFram
 
 def test_end_to_end_run(tmp_path: Path) -> None:
     summary, flagged, xlsx, csv = val.run_valuation_module(db_path=DB_PATH, output_dir=tmp_path)
-    assert len(summary) == 89
+    assert len(summary) == 92
     assert len(flagged) >= 20
     assert xlsx.exists()
     assert csv.exists()

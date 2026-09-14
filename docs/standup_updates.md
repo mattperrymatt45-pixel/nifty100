@@ -981,3 +981,46 @@ every page.
 
 **Final score: 752/752 tests passing** (751 prior + 1 integration
 module), Black & Ruff clean.
+
+## Day 28 - Retro & Documentation (Sprint 4)
+
+Closed out Sprint 4 with README documentation, a formal retrospective,
+task-board update, and a final data fix on the valuation panel.
+
+**Valuation panel data fix (89 → 92):**
+When regenerating `output/valuation_summary.xlsx` for the 92-company exit
+criterion, discovered that NHPC, TORNTPHARM, and BANDHANBNK were silently
+dropped because they have no `financial_ratios` row for `2024-03` (late
+filers) even though their market_cap, profitandloss, and balancesheet rows
+exist.  Root cause: `load_valuation_panel()` INNER JOINed financial_ratios.
+Patched to (a) use LEFT JOIN so market_cap companies always come through,
+(b) SELECT `mc.company_id` (not `fr.company_id`) so the id isn't NULLed out
+on miss, and (c) fall back to each company's latest available FY for FCF /
+net-profit / EBIT / book-value so FCF-yield and derived multiples still
+populate.  Result: valuation panel covers all 92 latest-year companies
+(53 Fair, 14 Caution, 25 Discount = 39 flagged names).
+
+**README.md rewrite:**
+Added complete dashboard run instructions (`streamlit run
+src/dashboard/app.py`, headless container invocation, Make shortcut), a
+full folder-structure map, per-screen descriptions for all 8 Streamlit
+pages (Home, Profile, Screener, Peers, Trends, Sectors, Capital,
+Reports), a valuation-module column dictionary and threshold reference,
+testing commands, and the Sprint 4 retrospective summary.
+
+**Documentation deliverables added:**
+  * `docs/sprint4_retro.md` — full retro covering UX decisions, edge
+    cases, performance, what went well, what to improve.
+  * `docs/task_board.md` — per-sprint, per-day checkbox board with all
+    Sprint 1–4 tasks marked complete and the Sprint 4 Definition-of-Done
+    exit-criteria table (all green).
+
+**Sprint 4 exit-criteria status:**
+  * All 8 Streamlit screens load without errors for all 92 tickers ✅
+  * Company Profile screen loads in 0.03–0.08s (well under 3s) ✅
+  * Screener CSV download produces a valid correctly-headed file ✅
+  * `valuation_summary.xlsx` has 92 rows with all 11 required columns ✅
+  * Sprint 4 review demo completed against the live server on :8501 ✅
+
+Tests re-gated: Black clean, Ruff clean, **752/752 tests passing**.
+Sprint 4 is officially signed off.

@@ -1,63 +1,70 @@
 # Nifty 100 Financial Intelligence Platform
 
-A production-grade data platform for ingesting, validating, analyzing, and visualizing financial data from the Nifty 100 index. The platform follows a modular, scalable architecture supporting ETL pipelines, analytics, interactive dashboards, and REST APIs.
+A production-grade Python data platform for ingesting, validating, analysing, and
+visualising financial data for the **Nifty 100** universe.  The platform follows a
+modular, scalable architecture spanning ETL pipelines, analytics, an interactive
+Streamlit dashboard, and a FastAPI layer, developed over a 45-day sprint plan.
 
 ---
 
 ## Project Overview
 
-The **Nifty 100 Financial Intelligence Platform** is a Python-based data engineering project designed to:
+The **Nifty 100 Financial Intelligence Platform** is designed to:
 
-- **Ingest** 12 distinct financial datasets covering equities, fundamentals, sectors, and macro indicators.
-- **Validate** incoming data for quality, consistency, and schema conformance.
-- **Load** cleansed data into a SQLite relational database with a robust schema.
-- **Analyze** data using statistical and machine-learning techniques.
-- **Visualize** insights through interactive Plotly charts and a Streamlit dashboard.
-- **Expose** data and analytics via a FastAPI REST API.
+- **Ingest** 12 financial datasets covering equities, fundamentals, sectors, and
+  macro indicators.
+- **Validate** incoming data for quality, schema conformance, and referential
+  integrity.
+- **Load** cleansed data into a SQLite relational warehouse (`db/nifty100.db`)
+  covering 92 Nifty-100 companies and up to 14 years of history.
+- **Analyse** data using ratio engines, peer-group comparisons, composite
+  quality scores, capital-allocation pattern detection, and sector-relative
+  valuation flags.
+- **Visualise** insights through an 8-screen Streamlit dashboard with Plotly
+  charts, live screeners, and drill-downs.
+- **Export** formatted Excel and CSV deliverables (`valuation_summary.xlsx`,
+  `valuation_flags.csv`, `screener_output.xlsx`, `peer_comparison.xlsx`).
 
-The codebase is structured following modern Python best practices: type hints, modular packages, logging, configuration via environment variables, automated linting/formatting, and a full test suite.
+The codebase follows modern Python standards: type hints, modular packages,
+Loguru-structured logging, python-dotenv configuration, Black/Ruff/Pytest gates,
+and a 750+ test suite.
 
 ---
 
 ## Folder Structure
 
 ```
-nifty100-platform/
-│
-├── data/
-│   ├── raw/            # Original, immutable source datasets
-│   ├── processed/      # Cleaned, transformed datasets ready for loading
-│   └── interim/        # Intermediate transformation artifacts
-│
-├── db/                 # SQLite database files and schema definitions
-├── output/             # Generated charts, exports, and analysis outputs
-├── reports/            # Generated HTML/PDF reports and notebooks exports
-├── notebooks/          # Jupyter/Lab notebooks for exploration and prototyping
-├── logs/               # Application log files (rotated automatically)
-├── config/             # Additional static configuration (YAML/JSON)
-│
-├── src/                # Main application source code
-│   ├── __init__.py
-│   ├── etl/            # Extract, Transform, Load pipelines
-│   ├── analytics/      # Statistical analysis and ML modules
-│   ├── dashboard/      # Streamlit dashboard code
-│   ├── api/            # FastAPI REST API endpoints
-│   └── utils/          # Shared utilities (logging, config, helpers)
-│
-├── tests/              # Pytest test suite
-│   ├── __init__.py
-│   └── etl/            # Tests for ETL modules
-│
-├── scripts/            # Standalone utility scripts
-│
-├── requirements.txt    # Core production dependencies
-├── requirements-dev.txt# Development dependencies (includes prod)
-├── .env.example        # Example environment variable template
-├── .gitignore          # Git ignore rules
-├── .pre-commit-config.yaml  # Pre-commit hooks configuration
-├── pyproject.toml      # Project metadata and tool config (Black, Ruff, Pytest)
-├── Makefile            # Common developer commands
-└── README.md           # This file
+nifty100/
+├── config/                # Static YAML/JSON configuration
+├── data/                  # Raw, processed, and interim datasets
+├── db/
+│   └── nifty100.db        # Production SQLite warehouse (~12,800 ratios rows, 92 companies)
+├── docs/                  # Standup updates, sprint retros, task board
+├── logs/                  # Rotating Loguru logs + dashboard runtime log
+├── notebooks/             # Exploration / prototyping
+├── output/                # Generated deliverables
+│   ├── valuation_summary.xlsx   # 92 companies × 11 columns (colour-coded flags)
+│   ├── valuation_flags.csv      # Caution + Discount rows only
+│   ├── screener_output.xlsx
+│   ├── peer_comparison.xlsx
+│   └── capital_allocation.csv
+├── reports/               # Radar chart PNGs and generated artefacts
+├── scripts/               # CLI utilities (ETL, valuation, ratio population)
+├── src/
+│   ├── etl/               # Extract-Transform-Load pipelines + validation
+│   ├── analytics/         # Ratios, peers, composite scoring, valuation engine
+│   ├── screener/          # Screener engine and Excel/CSV exporter
+│   ├── dashboard/         # Streamlit multi-page UI
+│   │   ├── app.py         # Entry point (sidebar nav, wide layout, KPI header)
+│   │   ├── pages/         # 8 screens: 01_home … 08_reports
+│   │   └── utils/db.py    # @st.cache_data SQLite loaders (10-min TTL)
+│   └── utils/             # Config, logging, helpers
+├── tests/                 # Pytest suite (etl/kpi/screener/visuals/analytics/dashboard)
+├── pyproject.toml         # Black/Ruff/Pytest configuration
+├── requirements.txt
+├── requirements-dev.txt
+├── Makefile
+└── README.md
 ```
 
 ---
@@ -66,121 +73,304 @@ nifty100-platform/
 
 ### Prerequisites
 
-- **Python 3.12** or higher
-- **pip** (latest version recommended)
+- **Python 3.12+** (developed on Python 3.13)
+- **pip** (latest)
 - **git**
 
-### Virtual Environment Setup
-
-Create and activate a Python virtual environment before installing dependencies:
+### Setup
 
 ```bash
-# Create virtual environment
-python3.12 -m venv .venv
+git clone https://github.com/mattperrymatt45-pixel/nifty100.git
+cd nifty100
 
-# Activate on Linux / macOS
-source .venv/bin/activate
+python3.13 -m venv .venv
+source .venv/bin/activate        # Windows: .venv\Scripts\Activate.ps1
 
-# Activate on Windows (PowerShell)
-# .venv\Scripts\Activate.ps1
-```
-
-### Installing Dependencies
-
-For production/runtime use:
-
-```bash
-pip install --upgrade pip
-pip install -r requirements.txt
-```
-
-For development (includes testing, linting, formatting, and notebooks):
-
-```bash
 pip install --upgrade pip
 pip install -r requirements-dev.txt
-pre-commit install
+
+cp .env.example .env             # edit paths/ports if needed
 ```
 
-### Environment Configuration
+### Database
 
-Copy the example environment file and adjust values for your system:
+The production database ships at `db/nifty100.db` with 92 Nifty-100 companies,
+12,800+ financial-ratio rows, and market-cap data for CY 2019–2024.  To rebuild
+from raw data, run:
 
 ```bash
-cp .env.example .env
+python scripts/populate_ratios.py
+python scripts/day26_valuation.py    # regenerates output/valuation_summary.xlsx
 ```
-
-Edit `.env` to point paths, logging levels, and ports as needed.
 
 ---
 
-## Running Tests
+## Running the Dashboard
 
-Run the full test suite with coverage:
+From the project root:
 
 ```bash
+streamlit run src/dashboard/app.py
+```
+
+By default Streamlit binds to `http://localhost:8501`.  For headless / container
+deployments:
+
+```bash
+streamlit run src/dashboard/app.py \
+    --server.headless true \
+    --server.port 8501 \
+    --server.address 0.0.0.0 \
+    --browser.gatherUsageStats false
+```
+
+A `make run-dashboard` shortcut is also provided.  All database reads go through
+`src/dashboard/utils/db.py` which caches queries for 600 seconds
+(`@st.cache_data(ttl=600)`), so repeated navigation is instant.  The Company
+Profile screen renders in under 0.1 seconds per ticker on production data.
+
+### Running other services
+
+```bash
+make run-api          # FastAPI via Uvicorn (future endpoint surface)
+make test             # Full pytest suite with coverage
+make lint             # Ruff
+make format           # Black + Ruff --fix
+```
+
+---
+
+## Dashboard Screens
+
+The dashboard ships with **8 screens** accessed from an always-expanded sidebar
+under the title "Nifty 100 Analytics".  The layout uses `st.set_page_config`
+with `layout="wide"` and an expanded sidebar by default.
+
+### 1. Home
+- **Purpose:** Landing-page executive summary for the selected financial year.
+- **Contents:** 6 KPI tiles (companies covered, median ROE, median ROCE, median
+  P/E, median D/E, FCF-positive count), a sector-distribution donut chart, a
+  top-5 companies table by market cap/quality score, and a financial-year
+  selector.
+- **Data source:** `get_kpis_for_year()`, `get_latest_ratios()`.
+
+### 2. Company Profile
+- **Purpose:** Deep-dive single-company view with search/select.
+- **Contents:** Company card (logo, sector, about, website, BSE/NSE links), 6
+  key-metric tiles (market cap, P/E, ROCE, ROE, D/E, dividend yield), a grouped
+  Revenue vs PAT bar chart (10 years), a dual-axis ROE/ROCE line chart, and a
+  pros/cons panel (with a "No data" caption when pros/cons are unavailable).
+- **Edge cases handled:** tickers with fewer than 10 years of history drop NaN
+  rows and display a "partial data available" note; missing metrics show **N/A**
+  instead of crashing.
+- **Performance:** Loads in 0.03–0.08 s per ticker (3-second budget met).
+
+### 3. Screener
+- **Purpose:** Multi-factor filter across the Nifty 100 universe.
+- **Contents:** 10 metric sliders (ROCE, ROE, D/E, P/E, P/B, dividend yield,
+  FCF yield, 3y/5y/10y PAT CAGR), 6 preset buttons (quality_compounder,
+  value_pick, growth_accelerator, dividend_champion, debt_free_blue_chip,
+  turnaround_watch) per spec §25, a live result table, a CSV download button
+  (`screener_output.xlsx` schema), and a result-count badge.
+- **Edge cases handled:** extreme slider combinations (all-min, all-max) return
+  the full universe or an empty state without error.
+
+### 4. Peers
+- **Purpose:** Company vs peer-group benchmarking.
+- **Contents:** Peer-group dropdown (11 groups), an 8-axis Plotly
+  `Scatterpolar` radar comparing the selected company against the peer-group
+  average, and a KPI table with the sector/peer benchmark highlighted in gold.
+
+### 5. Trends
+- **Purpose:** Multi-metric time-series exploration.
+- **Contents:** Multi-select metric picker, dual-Y-axis line chart, year-
+  over-year annotations on key inflection points, and company/ticker compare.
+
+### 6. Sectors
+- **Purpose:** Cross-sector overview and relative valuation.
+- **Contents:** Plotly bubble chart (X = Revenue, Y = ROE, size = market cap,
+  colour = sector), median-KPI bar charts per sector, and sector selector.
+- **Bug-fix Day 27:** corrected `company_id` vs `ticker` column name from
+  `get_full_ratios_with_pl()` so bubbles render for all companies.
+
+### 7. Capital Allocation
+- **Purpose:** Visualise how companies deploy cash (CFO/CFI/CFF patterns).
+- **Contents:** Plotly treemap grouped by `capital_allocation_pattern`
+  (Shareholder Returns, Mixed, Reinvestor, Growth Funded by Debt, …) with
+  pattern-specific colour coding; drill-down by pattern to view constituent
+  companies; quality-score hover tooltips.
+
+### 8. Reports
+- **Purpose:** One-stop hub for BSE filings and project artefact downloads.
+- **Contents:** BSE annual-report link checker with green (200) / red (404)
+  status badges, quick links to NSE/BSE profiles, and downloads for
+  `valuation_summary.xlsx`, `valuation_flags.csv`, `peer_comparison.xlsx`, and
+  `screener_output.xlsx`.
+- **Performance:** HEAD probes to BSE use a 2-second timeout so the page stays
+  responsive when BSE is slow; unknown tickers (e.g. `__GHOST__`) skip the probe
+  cleanly.
+
+---
+
+## Valuation Module (Sprint 4)
+
+`src/analytics/valuation.py` implements a sector-relative valuation engine:
+
+| Column | Description |
+|---|---|
+| `company_id` / `company_name` / `sector` | Identifiers and broad sector |
+| `pe_ratio`, `pb_ratio`, `ev_ebitda` | Trailing multiples from market-cap table |
+| `fcf_yield_pct` | `free_cash_flow_cr / market_cap_crore × 100` |
+| `5yr_median_PE` | 5-year median P/E per company (pandas median; SQLite lacks MEDIAN()) |
+| `sector_median_PE` | Median P/E per broad sector (positive-P/E rows only) |
+| `PE_vs_sector_median_pct` | `P/E ÷ sector_median × 100` |
+| `flag` | **Caution** (>1.5× sector median), **Discount** (<0.7×), **Fair** |
+
+Thresholds: `SECTOR_PREMIUM_MULTIPLIER = 1.5`, `SECTOR_DISCOUNT_MULTIPLIER = 0.7`.
+Loss-makers (PE ≤ 0 or NaN) default to Fair.  Outputs are colour-coded in Excel
+(red = Caution, green = Discount, yellow = Fair) with frozen header and auto-
+sized columns; the CSV contains only flagged (Caution + Discount) names.
+
+**Current run on FY 2024-03 data:** 92 companies, 53 Fair / 14 Caution /
+25 Discount, 39 flagged names exported to `output/valuation_flags.csv`.
+
+Regenerate via:
+
+```bash
+python scripts/day26_valuation.py                # default DB + output/
+python scripts/day26_valuation.py --year 2023    # earlier CY
+```
+
+---
+
+## Testing
+
+```bash
+# Full suite (no coverage, fast feedback)
+python -m pytest tests/ -q --no-cov
+
+# With coverage
 make test
 ```
 
-Or directly with pytest:
+The suite currently stands at **752 passing tests** across ETL, KPI, screener,
+visuals, analytics, and dashboard integration (including the Day-27 smoke test
+that renders all 8 screens across 10 cross-sector tickers plus extreme-screener
+slider values).
+
+Code-quality gates (enforced pre-commit):
 
 ```bash
-pytest tests/ -v --cov=src --cov-report=term-missing
+python -m black src/ tests/ scripts/ -q
+python -m ruff check src/ tests/ scripts/ --fix -q
 ```
 
 ---
 
-## Common Commands (via Make)
+## Sprint 4 Retrospective
 
-| Command            | Description                                |
-|--------------------|--------------------------------------------|
-| `make install`     | Install production dependencies            |
-| `make install-dev` | Install development dependencies           |
-| `make test`        | Run tests with coverage report             |
-| `make lint`        | Run Ruff linter on the source tree         |
-| `make format`      | Format code with Black (and fix Ruff)      |
-| `make clean`       | Remove caches, build artifacts, and .pyc   |
-| `make run-dashboard` | Launch the Streamlit dashboard          |
-| `make run-api`     | Launch the FastAPI server with Uvicorn      |
+Sprint 4 (Days 22–28) shipped the Streamlit dashboard and the sector-relative
+valuation engine.
+
+### UX decisions
+- **Wide layout + expanded sidebar** by default — analysts need room for
+  Plotly charts and the multi-screen flow benefits from the sidebar always
+  being visible.
+- **Consistent KPI tile pattern** (6 tiles per page, `st.columns([1,1,1,1,1,1]`)
+  so Home / Profile / Screens feel unified.
+- **Gold benchmark highlighting** on the Peers KPI table and green/red status
+  badges on the Reports page — instant visual cue without colour-only encoding.
+- **Colour-coded valuation flags** (red Caution / green Discount / yellow Fair)
+  applied identically in `valuation_summary.xlsx` and in any future screen
+  that displays the flag, to avoid user re-learning.
+- **NaNs display as N/A** (not zero, not a blank crash) per accessibility and
+  data-honesty principles; partial-data (<10 years) charts get an explicit
+  caption note.
+
+### Data edge cases discovered
+- **Late filers in FY 2024-03:** NHPC, TORNTPHARM, BANDHANBNK were missing
+  `financial_ratios` rows for `2024-03` even though market_cap and
+  profitandloss/balancesheet had data.  Fixed `load_valuation_panel()` to use
+  LEFT JOIN and fall back to each company's latest available FY fundamentals
+  so the panel returns all 92 companies (was 89 on Day 26).
+- **`get_full_ratios_with_pl()` returns `company_id`, not `ticker`.**  Sectors
+  and Capital pages raised AttributeError until corrected on Day 27.
+- **SQLite has no `MEDIAN()` aggregate** — sector- and company-medians are
+  computed in pandas, grouped, and merged back.
+- **`icr_label` is NULL** for the debt-free cohort; debt-free filtering had to
+  fall back to `D/E ≤ 0.05 OR icr_label == "Debt Free"`.
+- **`prosandcons` only populated for 16 companies** (e.g. HINDUNILVR,
+  ASIANPAINT, PIDILITIND).  TCS and many others legitimately return no rows;
+  the Profile page now renders "No data" caption rather than a broken panel.
+- **Capital-allocation patterns in latest FY only cover 4 of the 8 pattern
+  buckets** (Shareholder Returns 58, Mixed 19, Reinvestor 10, Growth Funded by
+  Debt 2).  The treemap renders only populated buckets while retaining all 8
+  colour definitions for forward-compatibility.
+- **BSE `urlopen` HEAD probes can stall 4+ seconds.**  Tightened to a 2-second
+  timeout; pages should never wait on a third-party endpoint for core content.
+- **All-NaN ROE/ROCE series** for some partial-history tickers caused Plotly to
+  throw; charts now `dropna(how="all")` and plot only non-null traces.
+
+### Performance findings
+- `@st.cache_data(ttl=600)` makes intra-session navigation effectively instant
+  after first load.
+- **Company Profile screen: 0.03–0.08 s per ticker** across the 5 spot-checked
+  names (TCS, HDFCBANK, HINDUNILVR, RELIANCE, SUNPHARMA) — well under the 3 s
+  budget.
+- Heavy Plotly charts (treemap, bubble, radar) render in <200 ms on production
+  data; the 5yr-P/E median aggregation is done once per panel load, not per
+  company.
+- The full pytest suite runs in ~2.5 minutes end-to-end; the Day-27 dashboard
+  integration tests (which actually render page modules in-process via a
+  Streamlit shim) account for ~60 seconds of that.
+
+### What we would do differently next sprint
+- Add a real Streamlit E2E layer (e.g. `streamlit.testing.v1.AppTest`) once
+  stable on Python 3.13; the shim is pragmatic but won't catch CSS / layout
+  regressions.
+- Pre-compute the valuation panel and persist alongside the DB so the Home /
+  Screener / Valuation surfaces don't each repeat the join.
+- Back-fill `prosandcons` for the remaining 76 companies from a structured
+  source (currently only 16 populated).
 
 ---
 
 ## Project Workflow
 
-The platform is developed in sprints. Each sprint builds on the previous one:
+The platform is developed in four completed sprints (Day 1 through Day 28):
 
-1. **Sprint 1 - Environment Setup (Day 1):** Project scaffolding, dependencies, tooling, logging, and configuration.
-2. **Sprint 1 - ETL Foundation (Day 2):** Data loaders, validators, SQLite schema, and loaders.
-3. **Sprint 2 - Analytics:** Exploratory analysis, metrics, and feature engineering.
-4. **Sprint 3 - Dashboard:** Streamlit interactive visualizations.
-5. **Sprint 4 - API:** FastAPI endpoints for programmatic access.
-6. **Sprint 5 - ML & Reporting:** Predictive models, NLP for news, and report generation.
+1. **Sprint 1 — Environment & ETL Foundation (Days 1–7):** Scaffolding,
+   dependencies, logging, config, 12-dataset loaders, validators, SQLite
+   schema, ratio population.
+2. **Sprint 2 — Analytics Engine (Days 8–14):** KPIs, sector analysis, peer
+   groups, composite scores, radar charts, capital-allocation patterns,
+   screener engine, Excel/CSV exporters.
+3. **Sprint 3 — Presets & Screening (Days 15–21):** Six spec-§25 screening
+   presets, peer-report PDFs, quality/debt/turnaround labelling, edge-case
+   hardening.
+4. **Sprint 4 — Dashboard & Valuation (Days 22–28):** 8-screen Streamlit app
+   (Home, Profile, Screener, Peers, Trends, Sectors, Capital, Reports),
+   sector-relative valuation engine (Caution/Discount/Fair flags), integration
+   QA across 92 tickers, README + retro documentation.
 
----
-
-## Future Sprint Overview
-
-| Sprint | Focus Area                          | Key Deliverables                                       |
-|--------|-------------------------------------|--------------------------------------------------------|
-| 1      | ETL & Database                      | 12-dataset ingestion, validation, SQLite warehouse    |
-| 2      | Analytics Engine                    | Sector analysis, returns, risk metrics, correlations   |
-| 3      | Interactive Dashboard               | Streamlit UI with Plotly charts, filters, drill-downs  |
-| 4      | REST API                            | FastAPI endpoints, auto-docs, pagination, filtering    |
-| 5      | ML & NLP Insights                   | Price prediction, sentiment analysis, PDF reports      |
+See `docs/standup_updates.md` for per-day notes and `docs/task_board.md` for
+the sprint backlog status.
 
 ---
 
 ## Code Quality Standards
 
-- **Black** for deterministic code formatting (line length 100).
-- **Ruff** for fast linting, import sorting, and auto-fixes.
-- **Pytest** for unit and integration tests with coverage gates.
-- **Loguru** for structured, rotating logs.
-- **python-dotenv** for environment-based configuration.
+- **Black** — deterministic formatting (line length 100).
+- **Ruff** — fast linting, import sorting, auto-fixes.
+- **Pytest** — 752 unit + integration tests with coverage gates.
+- **Loguru** — structured, rotating logs in `logs/`.
+- **python-dotenv** — environment-based configuration (`.env.example`
+  provided).
 - **Pre-commit hooks** enforce formatting and linting before every commit.
+- **Commit message format:** `[SprintN-DayM] feat: description`.
 
 ---
 
 ## License
 
-Internal project - All rights reserved.
+Internal project — all rights reserved.
