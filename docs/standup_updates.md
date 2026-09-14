@@ -1285,3 +1285,52 @@ Ruff clean.
 6. Added `reportlab` to dependencies.
 
 **Test count progression:** 828 (Day 31) → 860 (Day 32+33, +32 new tests).
+
+---
+
+## Day 33 (complete) — PDF Tearsheet Template (full 2-page layout)
+
+**Module:** `src/reports/tearsheet.py` (completely rewritten from initial scaffold)
+**CLI:** `scripts/day33_tearsheet_template.py`
+**Tests:** `tests/reports/test_tearsheet.py` (53 tests including 5 cross-sector parametrized)
+
+**Page 1** (per spec): Navy header with company + ticker; 6 KPI tiles in 2x3 grid
+(Market Cap, P/E, ROE, ROCE, D/E, 5yr PAT CAGR); side-by-side 10-year Revenue
+and Net Profit bar charts (negative NP in red); full-width ROE vs ROCE dual-axis
+line chart.
+
+**Page 2** (per spec):
+* Balance Sheet composition stacked bar (Equity / Borrowings / Other Liabilities
+  across up to 10 years).
+* Cash Flow waterfall for latest FY showing CFO, CFI, CFF, and Net Cash Flow
+  (green for positive, red for negative; Net CF highlighted in navy/red).
+* Two-column Pros/Cons table: green "Strengths" bullets and red "Risks/Watch
+  Items" bullets, each capped at 6 items drawn from the Day-30 auto-generated
+  `output/pros_cons_generated.csv` with fallback to the `prosandcons` table.
+* Capital Allocation badge: a coloured pill (green = Shareholder Returns/Cash
+  Accumulator, navy = Reinvestor, amber = Mixed/Liquidating, red = Growth
+  Funded by Debt/Distress, grey = Pre-Revenue).
+
+**Word wrap:** Every table cell (KPI values, pros/cons text, headers, badge)
+uses ReportLab `Paragraph` flowables with Helvetica/Helvetica-Bold at 8pt,
+so even very long pro/con text wraps correctly. HTML-unsafe characters (`&`,
+`<`, `>`) are escaped before insertion.
+
+**Cross-sector test set (5 companies):**
+* TCS (Information Technology)
+* HDFCBANK (Financials)
+* RELIANCE (Energy)
+* SUNPHARMA (Healthcare)
+* TATASTEEL (Materials)
+
+Automated tests verify: valid `%PDF-` header, exactly 2 pages per file, all
+text blocks fit within A4 margins (max bottom-y < 810pt, i.e. no overflow),
+Page 2 contains all 5 required sections (Balance Sheet, Cash Flow, Strengths,
+Risks, Capital Allocation), Page 1 has 3+ images and Page 2 has 2+ images,
+and the pros-heavy ASIANPAINT (9 pros truncated to 6) also fits without
+overflow.
+
+**Final score:** 820 non-dashboard tests passing (incl. 53 new), Black &
+Ruff clean. Dashboard test collection remains at 891 total. Sample
+tearsheets are in `output/tearsheets/sample_{TCS,HDFCBANK,RELIANCE,SUNPHARMA,TATASTEEL}.pdf`
+(avg ~110 KB each, 2 pages, 5 embedded charts).
