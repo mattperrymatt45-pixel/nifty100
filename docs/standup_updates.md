@@ -1088,3 +1088,69 @@ end-to-end CSV emission.
 
 **Final score: 778/778 tests passing** (752 prior + 26 new), Black &
 Ruff clean.
+
+## Day 30 - NLP: Auto Pros/Cons Generator (Sprint 5)
+
+Shipped the second NLP module: an automated pros/cons generator that
+evaluates every company in the Nifty 100 universe against 12 pro rules,
+12 con rules (plus 8 watch-list "soft" cons), assigns a 0-100 confidence
+score, and emits only observations scoring above 60.
+
+**Module added: `src/nlp/pros_cons_generator.py`**
+  * `CompanyContext` dataclass pre-joins financial_ratios, profitandloss,
+    balancesheet and market_cap (sorted newest-to-oldest) per company,
+    with `latest_ratios() / latest_pl() / latest_mc() / ratio_series()`
+    accessors.
+  * Streak helpers `_streak_positive`, `_streak_negative`,
+    `_streak_improving`, `_streak_declining`, `_streak_rising_de` cover
+    multi-year conditions; `_clip_conf` clamps confidence to [0,100].
+  * **12 Pro rules** (P1-P12): ROE>20% sustained 3+yr, FCF positive
+    5+yr, D/E=0 debt-free, Revenue CAGR>15% 5yr, OPM>25% latest yr, PAT
+    CAGR>20% 5yr, ICR>10 or Debt Free, Div Yield>2% with FCF positive,
+    EPS CAGR>15% 5yr, ROE improving 3yr, PAT CAGR > Revenue CAGR
+    (operating leverage), assets growing with declining debt.
+  * **12 Con rules** (C1-C12): D/E>2.0 non-financial (formatted with
+    actual ratio to 2dp), FCF negative 3yr, OPM declining 3yr, net loss
+    latest yr, revenue declining 2+yr, ICR<1.5 (skipped for debt-free),
+    dividend payout>100%, D/E rising 3yr, EPS declining 3yr, ROCE<10%,
+    Net Debt >3x EBITDA (formatted to 1dp), Revenue CAGR<5% 5yr
+    (PAT CAGR<5% for financials).
+  * **8 watch-list cons (C13-C20)** at 60-65 confidence for near-miss
+    bands (ROCE 10-15%, ICR 1.5-3, D/E 1.0-2.0, CAGR 5-10%, payout
+    70-100%, FCF negative only latest yr, D/E 0.5-1.0, OPM YoY slip)
+    so that healthy Nifty-100 names still receive at least one con
+    observation without flooding with red flags.
+  * **Confidence scoring:** multi-year streaks score higher for longer
+    streaks, ratio thresholds scale with margin past the threshold
+    (capped at 100), hard binary rules score 95.
+  * Fallback pro/con generators inspect the context (ROE>=15%, ROCE>=15%,
+    positive FCF, positive net profit, etc. on the pro side; closest-to-
+    firing metric bands on the con side) and emit a 62-confidence note
+    only when a company would otherwise have zero of that type.
+  * Output CSV: `output/pros_cons_generated.csv` with the five spec
+    columns: `company_id, type, rule_id, text, confidence_pct`
+    (`company_name` retained in the returned DataFrame for downstream
+    use but dropped in the CSV artifact per the Day-30 contract).
+
+**CLI script: `scripts/day30_pros_cons.py`** accepts `--db-path`,
+`--output`, `--threshold` (default 60).
+
+**Results on production DB (FY 2024-03):**
+  * 92/92 companies have >=1 pro; 92/92 companies have >=1 con.
+  * 521 total observations emitted (299 pro / 222 con).
+  * Fallback pro used for 6 companies; fallback con used for 15
+    companies (watch-list soft cons cover the rest).
+  * Top-firing pro rules: P11 operating leverage (47), P4 revenue CAGR
+    (35), P8 dividend+FCF (33), P6 PAT CAGR (31), P9/P12 (30).
+  * Hard cons: C10 ROCE<10% (14), C1 D/E>2 (10), C11 net debt/EBITDA (7),
+    C12 rev CAGR<5% (7).
+
+**Tests added: 30 new tests in `tests/nlp/test_pros_cons.py`** (on top
+of the 26 Day-29 parser tests = 56 total NLP tests) covering every
+pro/con rule on synthetic inputs, financial-sector carve-outs,
+confidence bounds (0-100, zero when not triggered), end-to-end
+coverage (92 companies each with at least one pro and con, CSV columns
+match the spec, all emitted rows >=60 confidence), and readable output.
+
+**Final score: 808/808 tests passing** (778 prior + 30 new), Black &
+Ruff clean.
