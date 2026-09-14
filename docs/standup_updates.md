@@ -1334,3 +1334,48 @@ overflow.
 Ruff clean. Dashboard test collection remains at 891 total. Sample
 tearsheets are in `output/tearsheets/sample_{TCS,HDFCBANK,RELIANCE,SUNPHARMA,TATASTEEL}.pdf`
 (avg ~110 KB each, 2 pages, 5 embedded charts).
+
+---
+
+## Day 34 — Batch Report Generation (Sprint 5)
+
+**Module:** `src/reports/batch.py`
+**CLI:** `scripts/day34_batch_reports.py`
+**Tests:** `tests/reports/test_batch.py` (14 tests including a full end-to-end
+run into a temp directory).
+
+**Tasks completed:**
+
+1. **Batch tearsheet generation** — 92 company tearsheets generated into
+   `reports/tearsheets/<TICKER>_tearsheet.pdf` in 61.6 seconds. The
+   `batch_generate_tearsheets()` helper reuses `load_tearsheet_data()` +
+   `generate_tearsheet_pdf()` from Day 33, and checks for a minimum of
+   `MIN_YEARS_REQUIRED=3` years of shared CF+P&L+BS data before rendering.
+
+2. **Skip list** — all 92 companies have ≥3 years of data, so the skip list is
+   empty; `output/skipped_tearsheets.csv` is still written with a header row
+   for downstream pipelines. The helper supports arbitrary min-year thresholds
+   (covered by a test with threshold=50 that skips all 92).
+
+3. **Sector reports — 11 PDFs** in `reports/sector/<slug>_report.pdf`, one per
+   broad sector:
+     * Financials (19), Energy (16), Consumer Discretionary (12), Materials (11),
+       Consumer Staples (9), Healthcare (7), IT (6), Communication Services (4),
+       Industrials (4), Conglomerates/Other (2), Real Estate (2).
+   * Each sector PDF contains: navy title bar with company count + overall
+     Nifty 100 median ROE/ROCE benchmark; 4×2 median KPI tiles (Market Cap,
+     P/E, P/B, ROE, ROCE, D/E, 5yr Rev CAGR, 5yr PAT CAGR); a market-cap
+     composition pie chart alongside a horizontal bar comparing the sector's
+     median ROE/ROCE against every other sector; and a company-level table
+     with 8 metrics per company plus capital-allocation pattern.
+   * Sectors with more companies (Financials 19, Energy 16, Materials 11,
+     Consumer Discretionary 12) flow to 2 pages; smaller sectors fit on 1.
+
+4. **Verification:** `ls reports/tearsheets/ | wc -l` returns 92; `ls reports/sector/`
+   returns 11 PDFs; programmatic spot-check of all 92 tearsheets confirms
+   exactly 2 pages, ≥3 images on page 1, ≥2 images on page 2, and no text
+   overflow beyond y=810pt. A second random 5-company visual sample
+   (ADANIPORTS, BANDHANBNK, EICHERMOT, HCLTECH, TATAPOWER) also passes.
+
+**Final test count:** 834 (820 non-dashboard + 14 new Day-34 batch tests).
+Black & Ruff clean. Committed as `[Sprint5-Day34]` and pushed.

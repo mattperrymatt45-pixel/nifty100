@@ -95,3 +95,8 @@ dist/
 
 # --- Streamlit ---
 .streamlit/secrets.toml
+output/tearsheets/
+reports/tearsheets/
+reports/sector/
+!reports/tearsheets/.gitkeep
+!reports/sector/.gitkeep
