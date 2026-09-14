@@ -37,3 +37,4 @@ nltk>=3.8.0
 # --- Utilities ---
 tqdm>=4.66.0
 loguru>=0.7.0
+reportlab

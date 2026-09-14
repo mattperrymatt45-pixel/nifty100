@@ -1222,3 +1222,66 @@ dtypes, plausible distress count), and end-to-end Excel/CSV output
 
 **Final score: 828/828 tests passing** (808 prior + 20 new), Black &
 Ruff clean.
+
+---
+
+## Day 32 — Capital Allocation Report (Sprint 5)
+
+**Module:** `src/analytics/capital_allocation_report.py`
+**CLI:** `scripts/day32_capital_allocation_report.py`
+**Tests:** `tests/analytics/test_capital_allocation_report.py` (12 tests)
+
+**Tasks completed:**
+1. **Completeness verification** — Confirmed `output/capital_allocation.csv` is
+   100% complete: 1182 rows / 92 companies covering every shared cashflow+P&L
+   year. No missing company_ids or (company, year) pairs.
+2. **Distribution summary** — Count of companies in each of the 8 canonical
+   capital-allocation patterns for latest FY:
+     * Shareholder Returns — 61
+     * Mixed                — 19
+     * Reinvestor           — 10
+     * Growth Funded by Debt—  2
+     * Distress Signal/Liquidating/Cash Accumulator/Pre-Revenue — 0 each
+   (The four zero-count patterns reflect the Nifty 100's mature, cash-generative
+   composition — no sign triples like (-,-,-) or (-,+,+) appear in the data.)
+3. **Capital allocation column** — Refreshed `output/cashflow_intelligence.xlsx`
+   via the Day-31 runner so the `capital_allocation_label` column is populated
+   for all 92 companies.
+4. **YoY pattern-change detection** — `output/pattern_changes.csv` lists 45
+   companies whose capital-allocation pattern shifted between their latest two
+   fiscal years (e.g. INDIGO and NAUKRI both moved from Shareholder Returns /
+   Mixed → Growth Funded by Debt in 2024-03, consistent with the Day-31
+   distress alerts).
+5. **Multi-sheet Excel report** — `output/capital_allocation_report.xlsx`
+   (Pattern Distribution, Pattern Changes (YoY), Completeness Audit).
+
+---
+
+## Day 33 — PDF Tearsheet Template (Sprint 5)
+
+**Module:** `src/reports/tearsheet.py` (new `src/reports/` package)
+**CLI:** `scripts/day33_tearsheet_template.py`
+**Tests:** `tests/reports/test_tearsheet.py` (20 tests)
+
+**Tasks completed:**
+1. Built a 2-page company tearsheet using ReportLab Platypus with A4 pages and
+   the project navy brand colour (`#1F4E78`).
+2. **Page 1 layout** (per spec):
+   * Navy header bar with company name, sector, and ticker code (white text).
+   * Six KPI tiles arranged 2 rows × 3 columns: Market Cap, P/E Ratio, ROE %,
+     ROCE %, D/E Ratio, 5yr PAT CAGR.
+   * Side-by-side 10-year Revenue and Net Profit bar charts (matplotlib, with
+     negative NP bars coloured red).
+   * Full-width ROE vs ROCE dual-axis line chart with legend and grid.
+3. **Page 2** — Cash Flow Quality & Capital Allocation summary table (CFO
+   Quality Tier, CapEx Tier, Pattern, 5yr Revenue CAGR, Dividend Yield, P/B,
+   EPS) with a placeholder note for the pros/cons and peer-comparison sections
+   that will be added in Days 34–35.
+4. Headless rendering using matplotlib `Agg` backend; charts embed as ReportLab
+   `Image` flowables via in-memory PNG.
+5. Sample tearsheets generated for RELIANCE, TCS, INDIGO, NAUKRI in
+   `output/tearsheets/` (each ~80KB, valid 2-page PDFs). Includes a
+   `generate_all_tearsheets()` batch helper ready for Day 34/35.
+6. Added `reportlab` to dependencies.
+
+**Test count progression:** 828 (Day 31) → 860 (Day 32+33, +32 new tests).
