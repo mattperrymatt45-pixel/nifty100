@@ -1154,3 +1154,71 @@ match the spec, all emitted rows >=60 confidence), and readable output.
 
 **Final score: 808/808 tests passing** (778 prior + 30 new), Black &
 Ruff clean.
+
+## Day 31 - Cash Flow Intelligence Module (Sprint 5)
+
+Added the Day-31 Cash Flow Intelligence module that classifies every Nifty
+100 company by CFO quality, CapEx intensity, distress risk, deleveraging
+activity, and capital-allocation pattern, producing the Excel summary and
+distress-alerts CSV.
+
+**Module added: `src/analytics/cashflow_intelligence.py`**
+  * New primitives (building on Day-11 cashflow_kpis.py primitives, which
+    remain unchanged to protect their existing test surface):
+      - `distress_signal(cfo, cff)` -> bool — True iff CFO < 0 AND CFF > 0
+        in the latest year (raises cash from financing while operations
+        burn cash).
+      - `deleveraging_flag(cff, borrowings_now, borrowings_prev)` -> bool
+        — True iff CFF < 0 AND borrowings declined year-over-year.
+      - `fcf_cagr(series, window=5)` — CAGR of FCF over trailing 5 years
+        using (end/begin)**(1/n)-1, requires start/end FCF positive.
+  * `build_cashflow_intelligence_panel(conn)` — joins companies, cashflow,
+    profitandloss, balancesheet, and sectors; computes per-company latest-FY
+    values including:
+      - **CFO Quality Score**: 5-year mean of CFO/PAT (min 3 valid years);
+        labels High Quality (>1.0), Moderate (0.5-1.0), Accrual Risk (<0.5).
+      - **CapEx Intensity %**: abs(CFI)/sales x 100; labels Asset Light
+        (<3%), Moderate (3-8%), Capital Intensive (>8%).
+      - **FCF 5-year CAGR** and **FCF Conversion %** (FCF / EBIT x 100,
+        falling back to op_profit as the EBITDA proxy).
+      - Distress flag, deleveraging flag, capital-allocation label
+        (reusing the Day-11 8-class classifier with the Shareholder
+        Returns carve-out).
+  * `write_intelligence_xlsx(df, path)` — navy header fill, red/green
+    highlight on boolean flag columns, auto-frozen header, auto-sized
+    columns.
+  * `write_distress_alerts_csv(df, conn, path)` — pulls latest-year CFO,
+    CFF, and net profit for each flagged company.
+  * `run_cashflow_intelligence()` high-level entry point (used by the CLI).
+
+**CLI script: `scripts/day31_cashflow_intelligence.py`** accepts `--db-path`
+and `--output-dir`.
+
+**Outputs produced:**
+  * `output/cashflow_intelligence.xlsx` — 92 rows x 12 columns (company_id,
+    company_name, sector, cfo_quality_score, cfo_quality_label,
+    capex_intensity_pct, capex_label, fcf_cagr_5yr, fcf_conversion_pct,
+    distress_flag, deleveraging_flag, capital_allocation_label).
+  * `output/distress_alerts.csv` — 2 flagged companies for FY 2024-03:
+    NAUKRI (Info Edge, CFO -11,125 Cr; CFF +35,045 Cr; PAT -3,620 Cr)
+    and INDIGO (CFO -1,896 Cr; CFF +14,596 Cr; PAT -634 Cr) — both
+    showing the textbook distress pattern.
+
+**Population distributions:**
+  * CFO Quality: 92/92 High Quality (Nifty 100 names all convert earnings
+    to operating cash effectively over the 5-year window).
+  * CapEx tier: 48 Capital Intensive, 44 Moderate.
+  * Capital allocation (latest FY): Shareholder Returns 61, Mixed 19,
+    Reinvestor 10, Growth Funded by Debt 2.
+  * Deleveraging names: 23.
+
+**Tests added: 20 new tests in `tests/analytics/test_cashflow_intelligence.py`**
+covering primitive flags (distress true/false/missing, deleveraging
+true/false/missing, FCF CAGR positive growth, undefined on negative
+endpoints, insufficient history), panel coverage (92 rows, required
+columns, score ranges, non-negative CapEx, valid tier labels, boolean
+dtypes, plausible distress count), and end-to-end Excel/CSV output
+(XLSX readable, CSV headers match, distress rows satisfy CFO<0/CFF>0).
+
+**Final score: 828/828 tests passing** (808 prior + 20 new), Black &
+Ruff clean.

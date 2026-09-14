@@ -27,6 +27,18 @@ from src.analytics.cagr import (
     compute_all_cagrs,
     compute_cagrs_for_series,
 )
+from src.analytics.cashflow_intelligence import (
+    CASHOUTPUT_COLUMNS,
+    DISTRESS_COLUMNS,
+    DistressAlertRow,
+    build_cashflow_intelligence_panel,
+    deleveraging_flag,
+    distress_signal,
+    fcf_cagr,
+    run_cashflow_intelligence,
+    write_distress_alerts_csv,
+    write_intelligence_xlsx,
+)
 from src.analytics.cashflow_kpis import (
     CAPEX_LIGHT_MAX,
     CAPEX_MODERATE_MAX,

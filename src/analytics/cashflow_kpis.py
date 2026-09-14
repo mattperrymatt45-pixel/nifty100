@@ -1,6 +1,7 @@
 """Nifty 100 Financial Intelligence Platform — Cash Flow KPI Engine.
 
-Implements Sprint 2 Day 11 KPIs per spec section 13 (KPI Reference):
+Implements Sprint 2 Day 11 KPIs (per spec section 13) and Sprint 5 Day 31
+Cash Flow Intelligence features:
 
     * Free Cash Flow (FCF)              = operating_activity + investing_activity
     * CFO / PAT Ratio (annual)          = operating_activity / net_profit
@@ -8,6 +9,11 @@ Implements Sprint 2 Day 11 KPIs per spec section 13 (KPI Reference):
     * CapEx Intensity                   = abs(investing_activity) / sales x 100, with tier labels
     * FCF Conversion Rate               = FCF / operating_profit x 100
     * Capital Allocation Pattern        = 8-class classifier from sign of (CFO, CFI, CFF)
+    * Distress Signal (Day 31)          = CFO < 0 AND CFF > 0 in latest year
+    * Deleveraging Flag (Day 31)        = CFF < 0 AND borrowings declining year-over-year
+    * FCF CAGR 5yr (Day 31)             = compound annual growth of FCF over trailing 5 years
+    * Output artifacts                  = output/cashflow_intelligence.xlsx +
+                                          output/distress_alerts.csv
 
 Edge cases handled:
     * PAT = 0             -> CFO/PAT = None (undefined)
