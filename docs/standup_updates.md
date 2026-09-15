@@ -1257,38 +1257,7 @@ Ruff clean.
 
 ---
 
-## Day 33 — PDF Tearsheet Template (Sprint 5)
-
-**Module:** `src/reports/tearsheet.py` (new `src/reports/` package)
-**CLI:** `scripts/day33_tearsheet_template.py`
-**Tests:** `tests/reports/test_tearsheet.py` (20 tests)
-
-**Tasks completed:**
-1. Built a 2-page company tearsheet using ReportLab Platypus with A4 pages and
-   the project navy brand colour (`#1F4E78`).
-2. **Page 1 layout** (per spec):
-   * Navy header bar with company name, sector, and ticker code (white text).
-   * Six KPI tiles arranged 2 rows × 3 columns: Market Cap, P/E Ratio, ROE %,
-     ROCE %, D/E Ratio, 5yr PAT CAGR.
-   * Side-by-side 10-year Revenue and Net Profit bar charts (matplotlib, with
-     negative NP bars coloured red).
-   * Full-width ROE vs ROCE dual-axis line chart with legend and grid.
-3. **Page 2** — Cash Flow Quality & Capital Allocation summary table (CFO
-   Quality Tier, CapEx Tier, Pattern, 5yr Revenue CAGR, Dividend Yield, P/B,
-   EPS) with a placeholder note for the pros/cons and peer-comparison sections
-   that will be added in Days 34–35.
-4. Headless rendering using matplotlib `Agg` backend; charts embed as ReportLab
-   `Image` flowables via in-memory PNG.
-5. Sample tearsheets generated for RELIANCE, TCS, INDIGO, NAUKRI in
-   `output/tearsheets/` (each ~80KB, valid 2-page PDFs). Includes a
-   `generate_all_tearsheets()` batch helper ready for Day 34/35.
-6. Added `reportlab` to dependencies.
-
-**Test count progression:** 828 (Day 31) → 860 (Day 32+33, +32 new tests).
-
----
-
-## Day 33 (complete) — PDF Tearsheet Template (full 2-page layout)
+## Day 33 — PDF Tearsheet Template (full 2-page layout)
 
 **Module:** `src/reports/tearsheet.py` (completely rewritten from initial scaffold)
 **CLI:** `scripts/day33_tearsheet_template.py`
