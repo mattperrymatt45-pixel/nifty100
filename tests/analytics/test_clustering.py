@@ -126,11 +126,11 @@ class TestClustering:
     def test_assign_cluster_names_uses_all_five(self, panel: pd.DataFrame) -> None:
         _lbl, centroids, _i = cl.run_clustering(panel)
         assert set(centroids["cluster_name"]) == {
-            "Quality Compounder",
-            "Growth Star",
-            "Value Play",
-            "Cash Cow / Yield",
-            "Turnaround / Risk",
+            "High-Quality Compounders",
+            "Emerging Growth",
+            "Value Cyclicals",
+            "Defensive Dividend Payers",
+            "Distressed / Turnaround",
         }
 
     def test_elbow_plot_and_csv_written(self, panel: pd.DataFrame, tmp_path: Path) -> None:

@@ -17,9 +17,12 @@ Pipeline per spec:
     5. Write output/cluster_labels.csv with columns
        company_id, cluster_id (0-4), cluster_name, distance_from_centroid.
 
-Cluster names are assigned after fitting by inspecting each centroid in
-original-feature space and mapping to intuitive investor archetypes
-(Quality Compounder, Growth Star, Value Play, Dividend / Cash Cow, Turnaround).
+Cluster names are assigned after fitting by a heuristic that inspects each
+centroid in original-feature space and maps to intuitive investor archetypes;
+the heuristic labels are then refined via a static mapping (finalised during
+Day-37 cluster review with the team lead) into the stable archetypes:
+High-Quality Compounders, Emerging Growth, Value Cyclicals,
+Defensive Dividend Payers, Distressed / Turnaround.
 """
 
 from __future__ import annotations
@@ -260,6 +263,18 @@ def run_clustering(panel: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame, np.
     centroids_df = pd.DataFrame(centroids_orig, columns=list(FEATURES))
 
     cluster_names = _assign_cluster_names(centroids_df)
+
+    # Day 37 team-lead review refined the heuristic labels. Keep a local
+    # mapping here so re-running clustering always produces stable, reviewed
+    # archetype names (avoiding circular import of cluster_profiling).
+    refined_labels = {
+        "Quality Compounder": "High-Quality Compounders",
+        "Growth Star": "Emerging Growth",
+        "Turnaround / Risk": "Distressed / Turnaround",
+        "Cash Cow / Yield": "Defensive Dividend Payers",
+        "Value Play": "Value Cyclicals",
+    }
+    cluster_names = {int(k): refined_labels.get(v, v) for k, v in cluster_names.items()}
 
     out = panel[["company_id", "company_name", "sector"]].copy()
     out["cluster_id"] = cluster_labels.astype(int)

@@ -1424,3 +1424,38 @@ directory that produces all three files with valid content.
 
 **Final non-dashboard test count:** 864 passing (849 + 15).
 Black & Ruff clean.
+
+## Day 37 — Cluster Profiling & Portfolio Statistics (Sprint 6)
+
+**Deliverables:**
+1. **Cluster profiling** — per-cluster mean & median of all 5 clustering
+   features → `output/cluster_profile.csv` (10 rows: 5 clusters × mean/median).
+2. **Refined cluster names** after team-lead review of constituent companies,
+   valuation multiples, ROCE, dividend yields and sector mix:
+     * 0 → Emerging Growth (34 companies)
+     * 1 → Distressed / Turnaround (4: HINDPETRO, INDIGO, NAUKRI, TATAPOWER)
+     * 2 → Value Cyclicals (29)
+     * 3 → High-Quality Compounders (18)
+     * 4 → Defensive Dividend Payers (7)
+   Updated `output/cluster_labels.csv`, `output/cluster_centroids.csv`, and
+   patched `src/analytics/clustering.py` so re-runs emit refined names.
+3. **Correlation heatmap** — Pearson r across 10 KPIs (ROE, ROCE, D/E,
+   Revenue CAGR 5yr, PAT CAGR 5yr, OPM, NPM, Div Payout, P/E, P/B) for all
+   92 companies → `reports/correlation_heatmap.png` (seaborn annotated).
+   Key relationships: OPM↔NPM 0.92, ROCE↔OPM 0.59, D/E↔NPM -0.70.
+4. **Outlier detection** — per-broad-sector Z-scores for all 10 KPIs; flag
+   |Z|>3 → `output/outlier_report.csv`. Single outlier flagged:
+   BAJFINANCE pat_cagr_5yr = 238.5% (Z=3.9 vs Financials sector mean 27.2%).
+5. **Portfolio statistics** → `output/portfolio_stats.csv` with P10, P25,
+   P50, P75, P90, Mean, Std, Min, Max, Count for each of the 10 KPIs.
+
+**Tests:** 33 new tests in `tests/analytics/test_cluster_profiling.py`
+covering constants, KPI loading (92 rows, 10 numeric columns), cluster
+profiling (sizes, archetype ordering, writer output), re-labelling,
+correlation matrix (symmetric, diagonal=1, OPM↔NPM strong positive),
+heatmap PNG generation, outlier detection (columns, |Z|>3 invariant,
+BAJFINANCE specifically), portfolio stats (percentile ordering,
+mean between P10-P90, counts), and end-to-end run into tmp dir.
+
+**Final non-dashboard test count:** 897 passing (864 + 33).
+Black & Ruff clean.
