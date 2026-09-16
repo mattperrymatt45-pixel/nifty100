@@ -1514,3 +1514,64 @@ module tag), OpenAPI tag coverage, /api/v1 prefix on every non-root path,
 
 **Final non-dashboard test count:** 927 passing (897 + 30).
 Black & Ruff clean. Committed as `[Sprint6-Day38]`.
+
+## Day 39 — API Endpoints — Company Data (Sprint 6)
+
+**Module:** `src/api/routers/companies.py` (replaces Day-38 stub)
+**Tests:** `tests/api/test_companies.py` (33 new tests)
+
+**Endpoints implemented under `/api/v1/companies`:**
+
+1. **GET /** — list of all 92 companies with id, company_name, broad_sector,
+   sub_sector, market_cap_category, roe_pct, roce_pct. Query filters:
+   * `?sector=Financials` (exact broad_sector match)
+   * `?market-cap=Large Cap` (exact market_cap_category match — uses alias
+     "market-cap" because Python identifiers can't contain hyphens)
+   * `?search=tata` (case-insensitive partial match on ticker OR company_name)
+   Returns `{count, companies: [...]}`; empty filters return all 92;
+   non-matching filters return 200 with count=0.
+2. **GET /{ticker}** — full company profile: `companies.*` fields + sector
+   data (broad_sector, sub_sector, index_weight_pct, market_cap_category)
+   + `latest_kpis` (latest financial_ratios row) + `latest_valuation`
+   (latest market_cap row). Ticker is uppercased for case-insensitive
+   lookup; returns HTTP 404 if not found.
+3. **GET /{ticker}/pl** — P&L history ordered by year ascending, supports
+   `?from=YYYY-MM&to=YYYY-MM` filters.
+4. **GET /{ticker}/bs** — balance-sheet history (same filters).
+5. **GET /{ticker}/cashflow** — cash-flow history (same filters).
+6. **GET /{ticker}/ratios** — all computed financial_ratios per year;
+   optional `?year=YYYY-MM` returns a single year.
+7. **GET /{ticker}/tearsheet** — binary PDF download of pre-generated
+   tearsheet (`reports/tearsheets/{TICKER}_tearsheet.pdf`) with
+   `Content-Type: application/pdf` and `Content-Disposition: attachment`.
+   404 if company unknown or PDF not generated.
+
+**Shared helpers (`src/api/db.py`):** `get_db_connection()` context manager
+with `sqlite3.Row` factory; `_row_to_dict()`/`_rows_to_list()`; year
+validator returning 422 with descriptive message for malformed
+YYYY-MM params.
+
+**Live verification (uvicorn on :8000):**
+  * `GET /api/v1/companies/` → 92 companies.
+  * `?sector=Financials` → 19; `?market-cap=Large Cap` → 69.
+  * `?search=Tata` → 6 companies (TATACOMM, TATACONSUM, TATAMOTORS,
+    TATAPOWER, TATASTEEL, TCS).
+  * `GET /companies/FAKE` → 404.
+  * `GET /companies/TCS/pl?from=2022-03&to=2024-03` → exactly 3 rows,
+    years 2022-03..2024-03.
+  * `GET /companies/TCS/tearsheet` → 200, 118 KB valid PDF (2 pages,
+    %PDF- header).
+  * `?from=bad` → 422 with descriptive error.
+
+**Tests:** 33 new covering list (92 rows, 6 required columns, sector /
+market-cap / search filters, combination, empty-result-200), profile
+(TCS+HDFCBANK, case-insensitive ticker, 404), time series (all three
+statements, column keys, from/to window = 3 rows for TCS, 422 on bad
+year, 404 on unknown, ascending order), ratios (full history ≥13 rows,
+single-year = 1 row, 404, 422, empty-year 200/0), tearsheet (PDF
+header, content-type, content-disposition, file size, 4 cross-sector
+tickers, 404). Day-38 scaffold test updated to expect the real
+/companies/ response (stubs remain for screener/sectors/peers/etc.).
+
+**Final non-dashboard test count:** 960 passing (927 + 33).
+Black & Ruff clean. Committed as `[Sprint6-Day39]`.

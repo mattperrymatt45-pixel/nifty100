@@ -143,7 +143,6 @@ class TestHealthEndpoint:
 # All 8 routers registered under /api/v1
 # ---------------------------------------------------------------------------
 EXPECTED_ROUTER_STUBS = [
-    ("companies", "companies"),
     ("screener", "screener"),
     ("sectors", "sectors"),
     ("peers", "peers"),
@@ -161,6 +160,14 @@ class TestRouterRegistration:
         body = r.json()
         assert body["module"] == name
         assert body["status"] == "scaffold"
+
+    def test_companies_root_returns_list(self, client: TestClient):
+        # /companies/ is now a real endpoint (Day 39) returning the full list.
+        r = client.get(f"{API_PREFIX}/companies/")
+        assert r.status_code == 200
+        body = r.json()
+        assert "companies" in body
+        assert body["count"] == 92
 
     def test_health_router_without_trailing_slash(self, client: TestClient):
         r = client.get(f"{API_PREFIX}/health")
