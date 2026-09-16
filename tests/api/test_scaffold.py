@@ -142,32 +142,24 @@ class TestHealthEndpoint:
 # ---------------------------------------------------------------------------
 # All 8 routers registered under /api/v1
 # ---------------------------------------------------------------------------
-EXPECTED_ROUTER_STUBS = [
-    ("screener", "screener"),
-    ("sectors", "sectors"),
-    ("peers", "peers"),
-    ("valuation", "valuation"),
-    ("portfolio", "portfolio"),
-    ("documents", "documents"),
-]
-
-
 class TestRouterRegistration:
-    @pytest.mark.parametrize("name,_tag", EXPECTED_ROUTER_STUBS)
-    def test_stub_returns_200(self, client: TestClient, name: str, _tag: str):
-        r = client.get(f"{API_PREFIX}/{name}/")
-        assert r.status_code == 200, f"Router {name} did not return 200"
-        body = r.json()
-        assert body["module"] == name
-        assert body["status"] == "scaffold"
-
-    def test_companies_root_returns_list(self, client: TestClient):
-        # /companies/ is now a real endpoint (Day 39) returning the full list.
-        r = client.get(f"{API_PREFIX}/companies/")
-        assert r.status_code == 200
-        body = r.json()
-        assert "companies" in body
-        assert body["count"] == 92
+    @pytest.mark.parametrize(
+        "path",
+        [
+            "/companies/",
+            "/screener/",
+            "/sectors/",
+            "/peers/IT Services",
+            "/market-cap/TCS",
+            "/portfolio/stats",
+            "/companies/TCS/documents",
+            "/companies/TCS/peers/compare",
+            "/health",
+        ],
+    )
+    def test_real_endpoints_return_200(self, client: TestClient, path: str):
+        r = client.get(f"{API_PREFIX}{path}")
+        assert r.status_code == 200, f"Endpoint {path} returned {r.status_code}"
 
     def test_health_router_without_trailing_slash(self, client: TestClient):
         r = client.get(f"{API_PREFIX}/health")
@@ -196,7 +188,9 @@ class TestRouterRegistration:
 
     def test_all_paths_prefixed_with_api_v1(self, client: TestClient):
         schema = client.get("/openapi.json").json()
-        api_paths = [p for p in schema["paths"] if p != "/"]
+        # Everything except "/" and /export/* must be under /api/v1.
+        allowed_non_api = {"/", "/export/openapi.json", "/export/postman.json"}
+        api_paths = [p for p in schema["paths"] if p not in allowed_non_api]
         for p in api_paths:
             assert p.startswith(API_PREFIX), f"Path {p} is not under {API_PREFIX}"
 

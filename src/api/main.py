@@ -125,7 +125,7 @@ app.include_router(documents.router, prefix=API_PREFIX)
 
 
 # ---------------------------------------------------------------------------
-# Root endpoint
+# Root + OpenAPI export
 # ---------------------------------------------------------------------------
 @app.get("/", tags=["Root"])
 def root() -> dict:
@@ -138,6 +138,61 @@ def root() -> dict:
         "openapi": "/openapi.json",
         "health": f"{API_PREFIX}/health",
     }
+
+
+def _openapi_schema() -> dict:
+    """Return the resolved OpenAPI schema dict (works across FastAPI versions)."""
+    return app.openapi()
+
+
+@app.get("/export/openapi.json", tags=["Export"])
+def export_openapi() -> JSONResponse:
+    """Return the OpenAPI 3.x specification as JSON (also written to
+    ``docs/openapi.json`` on demand by the CLI exporter).
+    """
+    schema = _openapi_schema()
+    return JSONResponse(schema)
+
+
+@app.get("/export/postman.json", tags=["Export"])
+def export_postman() -> JSONResponse:
+    """Generate a Postman Collection v2.1 JSON document with one request
+    per documented GET endpoint. Intended for quick import into Postman
+    without manual setup.
+    """
+    schema = _openapi_schema()
+    base = "http://localhost:8000"
+    items: list[dict] = []
+    for path, ops in schema.get("paths", {}).items():
+        for method, op in ops.items():
+            if method.lower() not in {"get", "post", "put", "delete", "patch"}:
+                continue
+            items.append(
+                {
+                    "name": f"{method.upper()} {path} — {op.get('summary', path)}",
+                    "request": {
+                        "method": method.upper(),
+                        "header": [{"key": "Accept", "value": "application/json"}],
+                        "url": {
+                            "raw": base + path,
+                            "host": ["localhost"],
+                            "port": "8000",
+                            "path": [p for p in path.strip("/").split("/") if p],
+                        },
+                        "description": op.get("description", op.get("summary", "")),
+                    },
+                }
+            )
+    collection = {
+        "info": {
+            "name": "Nifty 100 Financial Intelligence Platform API",
+            "description": API_DESCRIPTION,
+            "version": API_VERSION,
+            "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+        },
+        "item": items,
+    }
+    return JSONResponse(collection)
 
 
 # ---------------------------------------------------------------------------

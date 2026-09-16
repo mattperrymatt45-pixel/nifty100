@@ -1,0 +1,526 @@
+{
+  "info": {
+    "name": "Nifty 100 Financial Intelligence Platform API",
+    "_postman_id": "a1b2c3d4-0000-0000-0000-nifty100api00",
+    "description": "REST API for querying Nifty 100 financial data, analytics, screener results, peer comparisons, valuation, and portfolio intelligence.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "GET /api/v1/health \u2014 Service health check",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "http://localhost:8000/api/v1/health",
+          "host": [
+            "localhost"
+          ],
+          "port": "8000",
+          "path": [
+            "api",
+            "v1",
+            "health"
+          ]
+        },
+        "description": "Return service status, table row counts, uptime, and version.\n\nReturns 200 OK when the server can connect to the SQLite database and\nrun a count query. Returns 503 if the database is unreachable."
+      }
+    },
+    {
+      "name": "GET /api/v1/companies/ \u2014 List all companies",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "http://localhost:8000/api/v1/companies/",
+          "host": [
+            "localhost"
+          ],
+          "port": "8000",
+          "path": [
+            "api",
+            "v1",
+            "companies"
+          ]
+        },
+        "description": "Return list of all companies (default) filtered by any of the\nquery parameters. Each item includes id, name, sector, sub_sector,\nmarket_cap_category, and latest-year ROE / ROCE percentages."
+      }
+    },
+    {
+      "name": "GET /api/v1/companies/{ticker} \u2014 Get company profile",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "http://localhost:8000/api/v1/companies/{ticker}",
+          "host": [
+            "localhost"
+          ],
+          "port": "8000",
+          "path": [
+            "api",
+            "v1",
+            "companies",
+            "{ticker}"
+          ]
+        },
+        "description": "Return the full company profile: companies.* fields, sector data,\nand latest-year KPIs (financial_ratios + market_cap). Returns 404 if\nthe ticker is not found."
+      }
+    },
+    {
+      "name": "GET /api/v1/companies/{ticker}/pl \u2014 Profit & Loss history",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "http://localhost:8000/api/v1/companies/{ticker}/pl",
+          "host": [
+            "localhost"
+          ],
+          "port": "8000",
+          "path": [
+            "api",
+            "v1",
+            "companies",
+            "{ticker}",
+            "pl"
+          ]
+        },
+        "description": "Return P&L history (one row per fiscal year) for a company."
+      }
+    },
+    {
+      "name": "GET /api/v1/companies/{ticker}/bs \u2014 Balance Sheet history",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "http://localhost:8000/api/v1/companies/{ticker}/bs",
+          "host": [
+            "localhost"
+          ],
+          "port": "8000",
+          "path": [
+            "api",
+            "v1",
+            "companies",
+            "{ticker}",
+            "bs"
+          ]
+        },
+        "description": "Return balance-sheet history for a company."
+      }
+    },
+    {
+      "name": "GET /api/v1/companies/{ticker}/cashflow \u2014 Cash Flow history",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "http://localhost:8000/api/v1/companies/{ticker}/cashflow",
+          "host": [
+            "localhost"
+          ],
+          "port": "8000",
+          "path": [
+            "api",
+            "v1",
+            "companies",
+            "{ticker}",
+            "cashflow"
+          ]
+        },
+        "description": "Return cash-flow history for a company."
+      }
+    },
+    {
+      "name": "GET /api/v1/companies/{ticker}/ratios \u2014 Computed KPI history",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "http://localhost:8000/api/v1/companies/{ticker}/ratios",
+          "host": [
+            "localhost"
+          ],
+          "port": "8000",
+          "path": [
+            "api",
+            "v1",
+            "companies",
+            "{ticker}",
+            "ratios"
+          ]
+        },
+        "description": "Return all computed financial ratios per year for a company, or a\nsingle year when ``year`` is supplied."
+      }
+    },
+    {
+      "name": "GET /api/v1/companies/{ticker}/peers/compare \u2014 Radar comparison data: company vs peers",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "http://localhost:8000/api/v1/companies/{ticker}/peers/compare",
+          "host": [
+            "localhost"
+          ],
+          "port": "8000",
+          "path": [
+            "api",
+            "v1",
+            "companies",
+            "{ticker}",
+            "peers",
+            "compare"
+          ]
+        },
+        "description": "Return radar-ready 8-axis data for the company, its peer-group\naverage, and the benchmark company. Delegates to the peers module."
+      }
+    },
+    {
+      "name": "GET /api/v1/companies/{ticker}/tearsheet \u2014 Download tearsheet PDF",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "http://localhost:8000/api/v1/companies/{ticker}/tearsheet",
+          "host": [
+            "localhost"
+          ],
+          "port": "8000",
+          "path": [
+            "api",
+            "v1",
+            "companies",
+            "{ticker}",
+            "tearsheet"
+          ]
+        },
+        "description": "Return the pre-generated tearsheet PDF as ``application/pdf``."
+      }
+    },
+    {
+      "name": "GET /api/v1/screener/ \u2014 Screen companies by fundamental filters",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "http://localhost:8000/api/v1/screener/",
+          "host": [
+            "localhost"
+          ],
+          "port": "8000",
+          "path": [
+            "api",
+            "v1",
+            "screener"
+          ]
+        },
+        "description": "Screen companies by fundamental filters"
+      }
+    },
+    {
+      "name": "GET /api/v1/sectors/ \u2014 List all sectors with summary KPIs",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "http://localhost:8000/api/v1/sectors/",
+          "host": [
+            "localhost"
+          ],
+          "port": "8000",
+          "path": [
+            "api",
+            "v1",
+            "sectors"
+          ]
+        },
+        "description": "Return all broad sectors with company_count and median ROE / P/E / D/E\n(medians computed in-Python because SQLite has no MEDIAN())."
+      }
+    },
+    {
+      "name": "GET /api/v1/sectors/{sector}/companies \u2014 List companies in a sector",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "http://localhost:8000/api/v1/sectors/{sector}/companies",
+          "host": [
+            "localhost"
+          ],
+          "port": "8000",
+          "path": [
+            "api",
+            "v1",
+            "sectors",
+            "{sector}",
+            "companies"
+          ]
+        },
+        "description": "Return all companies in a broad sector with latest-year KPIs.\nReturns 404 for an unknown sector name."
+      }
+    },
+    {
+      "name": "GET /api/v1/peers/{group_name} \u2014 Get peer group members with percentiles",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "http://localhost:8000/api/v1/peers/{group_name}",
+          "host": [
+            "localhost"
+          ],
+          "port": "8000",
+          "path": [
+            "api",
+            "v1",
+            "peers",
+            "{group_name}"
+          ]
+        },
+        "description": "Return all companies in a peer group with percentile ranks for each\nof the 10 standard metrics. Returns 404 for an unknown group."
+      }
+    },
+    {
+      "name": "GET /api/v1/market-cap/{ticker} \u2014 Historical valuation multiples (2019-2024)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "http://localhost:8000/api/v1/market-cap/{ticker}",
+          "host": [
+            "localhost"
+          ],
+          "port": "8000",
+          "path": [
+            "api",
+            "v1",
+            "market-cap",
+            "{ticker}"
+          ]
+        },
+        "description": "Return annual market-cap, P/E, P/B, EV/EBITDA and dividend yield for\nthe company from calendar year 2019 through 2024. Returns 404 for an\nunknown ticker or a company with no market-cap rows in that window."
+      }
+    },
+    {
+      "name": "GET /api/v1/portfolio/stats \u2014 Portfolio percentile statistics across all 92 companies",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "http://localhost:8000/api/v1/portfolio/stats",
+          "host": [
+            "localhost"
+          ],
+          "port": "8000",
+          "path": [
+            "api",
+            "v1",
+            "portfolio",
+            "stats"
+          ]
+        },
+        "description": "Return P10/P25/P50/P75/P90/Mean/Std for the 10 core KPIs across all\ncompanies. Serves directly from the production DB (regenerates the\nstats on demand so they reflect the latest data); matches\n``output/portfolio_stats.csv`` schema from Day 37."
+      }
+    },
+    {
+      "name": "GET /api/v1/portfolio/clusters \u2014 Cluster archetype assignments (Day 36)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "http://localhost:8000/api/v1/portfolio/clusters",
+          "host": [
+            "localhost"
+          ],
+          "port": "8000",
+          "path": [
+            "api",
+            "v1",
+            "portfolio",
+            "clusters"
+          ]
+        },
+        "description": "Return the Day-36/37 cluster assignments from output/cluster_labels.csv."
+      }
+    },
+    {
+      "name": "GET /api/v1/companies/{ticker}/documents \u2014 List annual reports for a company",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "http://localhost:8000/api/v1/companies/{ticker}/documents",
+          "host": [
+            "localhost"
+          ],
+          "port": "8000",
+          "path": [
+            "api",
+            "v1",
+            "companies",
+            "{ticker}",
+            "documents"
+          ]
+        },
+        "description": "Return annual report links per fiscal year for the given company.\n\nEach entry contains ``year``, ``url`` and ``is_url_valid``. When\n``?check-urls=true`` is supplied, URLs are probed with a lightweight\nHEAD request (2-second timeout); otherwise validity is inferred from\nthe presence of a ``/missing/`` path token in the source URL (fast)."
+      }
+    },
+    {
+      "name": "GET / \u2014 Root",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "http://localhost:8000/",
+          "host": [
+            "localhost"
+          ],
+          "port": "8000",
+          "path": []
+        },
+        "description": "Root endpoint - API metadata and link to documentation."
+      }
+    },
+    {
+      "name": "GET /export/openapi.json \u2014 Export Openapi",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "http://localhost:8000/export/openapi.json",
+          "host": [
+            "localhost"
+          ],
+          "port": "8000",
+          "path": [
+            "export",
+            "openapi.json"
+          ]
+        },
+        "description": "Return the OpenAPI 3.x specification as JSON (also written to\n``docs/openapi.json`` on demand by the CLI exporter)."
+      }
+    },
+    {
+      "name": "GET /export/postman.json \u2014 Export Postman",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "http://localhost:8000/export/postman.json",
+          "host": [
+            "localhost"
+          ],
+          "port": "8000",
+          "path": [
+            "export",
+            "postman.json"
+          ]
+        },
+        "description": "Generate a Postman Collection v2.1 JSON document with one request\nper documented GET endpoint. Intended for quick import into Postman\nwithout manual setup."
+      }
+    }
+  ]
+}

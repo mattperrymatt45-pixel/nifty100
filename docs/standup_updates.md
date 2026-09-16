@@ -1575,3 +1575,63 @@ tickers, 404). Day-38 scaffold test updated to expect the real
 
 **Final non-dashboard test count:** 960 passing (927 + 33).
 Black & Ruff clean. Committed as `[Sprint6-Day39]`.
+
+## Day 40 — API Endpoints: Screener, Sectors, Peers, Valuation, Portfolio, Documents (Sprint 6)
+
+**Modules:** `src/api/routers/{screener,sectors,peers,valuation,portfolio,documents}.py`
+**CLI:** `scripts/day40_export_openapi.py`
+**Tests:** `tests/api/test_day40.py` (30 new)
+
+**Endpoints implemented:**
+
+1. **GET /api/v1/screener/** — filterable ranked list. Query params: `min_roe`,
+   `max_de`, `min_fcf`, `sector`, `min_rev_cagr_5yr`, `min_pat_cagr_5yr`,
+   `max_pe`. Non-numeric params return HTTP 400. Results ranked by composite
+   quality score desc; includes id, name, sector, all filter metrics,
+   valuation, market cap.
+2. **GET /api/v1/sectors/** — 11 sectors with company_count and median ROE /
+   P/E / D/E (Pandas-free — medians computed in-Python because SQLite lacks
+   MEDIAN()).
+3. **GET /api/v1/sectors/{sector}/companies** — all companies in a sector
+   with latest-year KPIs; 404 for unknown.
+4. **GET /api/v1/peers/{group_name}** — members + percentile ranks for all
+   10 peer metrics (`roe, roce, npm, de, fcf, pat_cagr_5yr, rev_cagr_5yr,
+   asset_turnover, interest_coverage, eps_cagr_5yr`); benchmark flag; 404
+   for unknown group.
+5. **GET /api/v1/companies/{ticker}/peers/compare** — 8-axis radar data
+   (roe, roce, npm, de, cfo_pat, pat_cagr_5yr, rev_cagr_5yr, composite):
+   company vector, peer-group average vector, benchmark vector. Returns 404
+   if the company has no peer group.
+6. **GET /api/v1/market-cap/{ticker}** — historical valuation multiples
+   (market_cap_crore, EV, P/E, P/B, EV/EBITDA, dividend yield) for calendar
+   years 2019-2024; 404 for unknown.
+7. **GET /api/v1/portfolio/stats** — P10/P25/P50/P75/P90/Mean/Std for 10
+   core KPIs, computed live from DB (matches Day-37 portfolio_stats.csv).
+8. **GET /api/v1/portfolio/clusters** — returns Day-36/37 cluster labels
+   from `output/cluster_labels.csv` (92 companies).
+9. **GET /api/v1/companies/{ticker}/documents** — annual report links per
+   year with `is_url_valid` flag; by default uses fast /missing/-token
+   heuristic; pass `?check-urls=true` to run a live HEAD check (2s timeout).
+10. **GET /export/openapi.json** + **GET /export/postman.json** — live
+    OpenAPI 3 schema and a Postman v2.1 collection (20 requests) generated
+    from the same schema.
+11. CLI `scripts/day40_export_openapi.py` writes `docs/openapi.json` (32 KB)
+    and `docs/postman_collection.json` (20 requests).
+
+**Endpoint count:** 20 total paths (9 company-data from Day 39 + 9 new data
+endpoints + 2 export endpoints + root/health).
+
+**Tests:** 30 new covering screener (unfiltered=92, min_roe, sector,
+combined filters, 400 on invalid input, response schema, ranked-order
+invariant), sectors (11 sectors, median columns, per-sector companies=19
+for Financials, KPI columns, 404), peers (IT Services has TCS+INFY+...,
+10 metrics, percentile+value keys, exactly one benchmark (TCS), 404, radar
+compare returns 8 axes + peer_avg + benchmark, radar 404), market-cap
+(TCS=6 years 2019-2024, columns present, 404), portfolio stats (10 KPIs,
+P10≤P50≤P90, labels), clusters (92 rows), documents (TCS ≥10 rows,
+url+year+is_url_valid, 404), export (OpenAPI schema has openapi/paths/health,
+Postman collection has ≥15 items, exported docs/openapi.json and
+docs/postman_collection.json exist on disk).
+
+**Final non-dashboard test count:** 990 passing (960 + 30).
+Black & Ruff clean. Committed as `[Sprint6-Day40]`.

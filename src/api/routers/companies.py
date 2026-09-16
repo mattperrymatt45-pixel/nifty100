@@ -285,6 +285,16 @@ def get_ratios(
     return {"ticker": tid, "count": len(history), "ratios": history}
 
 
+@router.get("/{ticker}/peers/compare", summary="Radar comparison data: company vs peers")
+def get_peer_radar(ticker: str) -> dict:
+    """Return radar-ready 8-axis data for the company, its peer-group
+    average, and the benchmark company. Delegates to the peers module.
+    """
+    from src.api.routers.peers import radar_compare  # local import avoids cycles
+
+    return radar_compare(ticker)
+
+
 # ---------------------------------------------------------------------------
 # 7. GET /companies/{ticker}/tearsheet - PDF download
 # ---------------------------------------------------------------------------
