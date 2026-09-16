@@ -1381,3 +1381,46 @@ Black & Ruff clean. Committed as `[Sprint5-Day34]` and pushed.
 
 **Final test count: 849 non-dashboard tests passing** (834 + 15 new Day-35).
 Black & Ruff clean.
+
+---
+
+## Day 36 — KMeans Clustering (Sprint 6)
+
+**Module:** `src/analytics/clustering.py`
+**CLI:** `scripts/day36_clustering.py`
+**Tests:** `tests/analytics/test_clustering.py` (15 tests)
+
+**Tasks completed:**
+1. **Feature panel** built from the DB for all 92 companies with five features:
+   return_on_equity_pct, debt_to_equity, revenue_cagr_5yr, fcf_cagr_5yr
+   (computed from the trailing 5-year cashflow history, reusing the
+   free_cash_flow + CAGR logic from Day 31), operating_profit_margin_pct.
+   All features already populated (0 NaNs in production data).
+2. **Imputation** — sector-median imputation with global-median fallback.
+   Verified with a synthetic test where an entire sector has missing ROE.
+3. **StandardScaler** normalisation to zero mean / unit variance before
+   clustering.
+4. **KMeans(n_clusters=5, random_state=42, n_init=10)** — deterministic
+   across runs (verified by fitting twice and comparing labels).
+5. **Cluster archetype labels** assigned by percentile-rank heuristic:
+     * Quality Compounder (18) — highest composite ROE+margin+low-debt rank
+     * Growth Star (34) — highest 5yr Revenue CAGR
+     * Value Play (29) — residual cluster (high D/E, moderate margins)
+     * Cash Cow / Yield (7) — highest 5yr FCF CAGR
+     * Turnaround / Risk (4) — lowest ROE (HINDPETRO, INDIGO, NAUKRI, TATAPOWER)
+6. **Elbow plot** saved to `reports/elbow_plot.png` (inertia vs k for k=2..10);
+   k=5 sits near the elbow (inertia drops 13.4% from k=4→k=5, 10.0% k=5→k=6,
+   7.5% k=7→k=8 — diminishing returns beyond k=5).
+7. **Outputs:** `output/cluster_labels.csv` (92 rows × 6 cols: company_id,
+   company_name, sector, cluster_id, cluster_name, distance_from_centroid);
+   `output/cluster_centroids.csv` (5 × feature centroids + label).
+
+**Tests:** 15 new tests covering constants, helpers, feature extraction
+(92 rows, required columns), imputation (sector median + global fallback),
+clustering output (5 unique labels, monotonic inertia, columns, non-negative
+distances), reproducibility under fixed random_state, correct archetype
+label set, writer outputs (CSV+PNG), and an end-to-end run into a tmp
+directory that produces all three files with valid content.
+
+**Final non-dashboard test count:** 864 passing (849 + 15).
+Black & Ruff clean.
