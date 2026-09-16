@@ -1459,3 +1459,58 @@ mean between P10-P90, counts), and end-to-end run into tmp dir.
 
 **Final non-dashboard test count:** 897 passing (864 + 33).
 Black & Ruff clean.
+
+## Day 38 — FastAPI Server Scaffold (Sprint 6)
+
+**Module:** `src/api/main.py`, `src/api/db.py`, `src/api/routers/` (8 routers)
+**CLI:** `scripts/day38_api_scaffold.py` (verification); run server via `uvicorn src.api.main:app --port 8000 --host 0.0.0.0`
+**Tests:** `tests/api/test_scaffold.py` (30 tests)
+
+**Deliverables:**
+
+1. **FastAPI application (`src/api/main.py`)**
+   * Title: "Nifty 100 Financial Intelligence Platform API"
+   * Version: `1.0.0-sprint6`
+   * `/docs` (Swagger UI), `/redoc` (ReDoc), `/openapi.json` enabled.
+2. **SQLite connection helpers (`src/api/db.py`)**
+   * `get_db_path()` → absolute path to `db/nifty100.db` via `settings.PROJECT_ROOT`.
+   * `get_db_connection()` context manager yields a sqlite3 connection with
+     `row_factory = sqlite3.Row`, auto-closing on exit.
+   * `table_row_counts()` returns `{table: count}` for the 10 core business
+     tables (companies, profitandloss, balancesheet, cashflow, analysis,
+     documents, prosandcons, sectors, stock_prices, market_cap). Missing
+     tables surface as 0 rather than raising.
+3. **CORS middleware** allowing all origins (`*`), all methods, all headers
+   (internal-use only).
+4. **Request-logging middleware** using loguru; logs method, path, response
+   status, and elapsed time (ms) for every request; attaches
+   `X-Response-Time-Ms` response header; unhandled exceptions return 500
+   with a JSON body (no stack trace leaked).
+5. **`routers/` directory** with one file per module:
+   `health.py`, `companies.py`, `screener.py`, `sectors.py`, `peers.py`,
+   `valuation.py`, `portfolio.py`, `documents.py` (each exposes an
+   `APIRouter` with a tag, plus a stub `GET /` returning `{module, status:
+   "scaffold", message}` to be replaced by real endpoints in later days).
+6. **All routers mounted under `/api/v1`** (API_PREFIX constant exported).
+7. **`GET /api/v1/health`** returns exactly the four required fields:
+   * `status: "ok"`
+   * `db_row_counts` (dict, exactly 10 tables with row counts)
+   * `uptime_seconds` (float, clock seeded at app startup via on_startup)
+   * `version: "1.0.0-sprint6"`
+   Returns HTTP 503 if the database is unreachable.
+8. **Verification:** `uvicorn src.api.main:app --port 8000 --host 0.0.0.0`
+   starts cleanly (startup log: "Application startup complete"), `/docs`
+   serves Swagger UI, `/openapi.json` exposes 9 paths, all 7 stubs return
+   200, CORS preflight responds with `access-control-allow-origin: *`,
+   and `X-Response-Time-Ms` header is present on every response.
+
+**Tests:** 30 new tests covering DB helpers (path exists, 10 tables, unique,
+92 companies/sectors), root endpoint payload, CORS preflight and response
+headers, logging middleware (header present, numeric value < 1s), health
+endpoint (200, 4 required keys, exactly 10 table counts, sane counts for
+companies/sectors, uptime monotonic increase), all 7 router stubs (200 +
+module tag), OpenAPI tag coverage, /api/v1 prefix on every non-root path,
+/docs & /redoc 200, OpenAPI title+version correct, 404 for unknown routes.
+
+**Final non-dashboard test count:** 927 passing (897 + 30).
+Black & Ruff clean. Committed as `[Sprint6-Day38]`.
