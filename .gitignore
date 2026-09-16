@@ -100,3 +100,5 @@ reports/tearsheets/
 reports/sector/
 !reports/tearsheets/.gitkeep
 !reports/sector/.gitkeep
+reports/portfolio/
+!reports/portfolio/.gitkeep

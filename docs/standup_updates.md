@@ -1348,3 +1348,36 @@ run into a temp directory).
 
 **Final test count:** 834 (820 non-dashboard + 14 new Day-34 batch tests).
 Black & Ruff clean. Committed as `[Sprint5-Day34]` and pushed.
+
+---
+
+## Day 35 — Portfolio Summary PDF & Sprint 5 Review
+
+**Module:** `src/reports/portfolio.py`
+**CLI:** `scripts/day35_portfolio_summary.py`
+**Tests:** `tests/reports/test_portfolio.py` (15 tests)
+**Retro:** `docs/sprint5_retro.md`
+
+1. **Portfolio Summary PDF** — `reports/portfolio/portfolio_summary.pdf`
+   contains one page per company in alphabetical order (92 pages). Each page:
+   navy header (company name + ticker), sector/FY subtitle, six KPI cards
+   (Revenue, Net Profit, ROE, ROCE, D/E, Net Margin) with value and a
+   trend-arrow comparing latest vs prior FY.
+   * ▲ green = metric improved (>2%)
+   * ▼ red = metric declined (>2%)
+   * ▶ grey = flat within ±2% (or missing data)
+   D/E uses inverse logic (decline = improvement). Footer shows page X / 92.
+2. **Sprint 5 retrospective** written covering wins (vertical-slice delivery,
+   deterministic PDF layout, defensive fallbacks, cross-sector parametrized
+   tests), improvements (sandbox reset cost, dashboard test timeouts,
+   zero-count pattern classes should be annotated in UI), and a metrics table
+   covering all Sprint-5 artifacts.
+3. **Exit criteria verification** — programmatic audit confirms all 9
+   deliverable criteria pass: pros_cons_generated.csv has ≥1 pro+1 con per
+   company (0 missing); 92 tearsheets exist at avg 113 KB (all ≥30 KB);
+   random 5-company visual sample shows no overflow/blank pages;
+   cashflow_intelligence.xlsx has 92 rows × 12 columns; 11 sector PDFs
+   present; portfolio summary is 92 pages.
+
+**Final test count: 849 non-dashboard tests passing** (834 + 15 new Day-35).
+Black & Ruff clean.
