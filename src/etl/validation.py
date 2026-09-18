@@ -78,6 +78,7 @@ class DQFailure:
     )
 
     def to_dict(self) -> dict[str, Any]:
+        """Serialise the DQFailure record to a plain dictionary."""
         return asdict(self)
 
 
@@ -258,6 +259,7 @@ def dq03_fk_integrity(tables: TableBundle) -> list[DQFailure]:
 # ---------------------------------------------------------------------------
 @register_rule("DQ-04")
 def dq04_balance_sheet_balance(tables: TableBundle) -> list[DQFailure]:
+    """DQ-04: flag rows where |total_assets - total_liabilities| / assets >= 1% (WARNING)."""
     failures: list[DQFailure] = []
     df = tables.get("balancesheet")
     if df is None or not _has(df, "total_assets") or not _has(df, "total_liabilities"):
@@ -293,6 +295,7 @@ def dq04_balance_sheet_balance(tables: TableBundle) -> list[DQFailure]:
 # ---------------------------------------------------------------------------
 @register_rule("DQ-05")
 def dq05_opm_crosscheck(tables: TableBundle) -> list[DQFailure]:
+    """DQ-05: flag rows where reported OPM% deviates from computed OPM% by >= 1pp (WARNING)."""
     failures: list[DQFailure] = []
     df = tables.get("profitandloss")
     if (
@@ -340,6 +343,7 @@ _FINANCIAL_SECTOR_KEYWORDS: tuple[str, ...] = ("bank", "nbfc", "finance", "finan
 
 @register_rule("DQ-06")
 def dq06_positive_sales(tables: TableBundle) -> list[DQFailure]:
+    """DQ-06: flag non-positive sales for non-financial companies (WARNING)."""
     failures: list[DQFailure] = []
     df = tables.get("profitandloss")
     if df is None or not _has(df, "sales"):
@@ -390,6 +394,7 @@ def dq06_positive_sales(tables: TableBundle) -> list[DQFailure]:
 # ---------------------------------------------------------------------------
 @register_rule("DQ-07")
 def dq07_year_format(tables: TableBundle) -> list[DQFailure]:
+    """DQ-07: flag year values that do not match YYYY-MM (CRITICAL)."""
     failures: list[DQFailure] = []
     # DQ-07 applies only to tables using the 'YYYY-MM' financial-year label
     # (normalized by normalize_year). Snapshot tables and calendar-year INT
@@ -429,6 +434,7 @@ _TICKER_PAT = re.compile(r"^[A-Z0-9&.\-]{2,12}$")
 
 @register_rule("DQ-08")
 def dq08_ticker_format(tables: TableBundle) -> list[DQFailure]:
+    """DQ-08: flag tickers that do not match [A-Z0-9&.-]{2,12} (CRITICAL)."""
     failures: list[DQFailure] = []
     companies = tables.get("companies")
     if companies is None or not _has(companies, "id"):
@@ -495,6 +501,7 @@ def dq08_ticker_format(tables: TableBundle) -> list[DQFailure]:
 # ---------------------------------------------------------------------------
 @register_rule("DQ-09")
 def dq09_net_cash_check(tables: TableBundle) -> list[DQFailure]:
+    """DQ-09: flag cashflow rows where net_cash_flow != CFO+CFI+CFF within Rs10 Cr (WARNING)."""
     failures: list[DQFailure] = []
     df = tables.get("cashflow")
     if df is None:
@@ -539,6 +546,7 @@ def dq09_net_cash_check(tables: TableBundle) -> list[DQFailure]:
 # ---------------------------------------------------------------------------
 @register_rule("DQ-10")
 def dq10_non_negative_fixed_assets(tables: TableBundle) -> list[DQFailure]:
+    """DQ-10: flag negative fixed_assets (WARNING)."""
     failures: list[DQFailure] = []
     df = tables.get("balancesheet")
     if df is None or not _has(df, "fixed_assets"):
@@ -570,6 +578,7 @@ def dq10_non_negative_fixed_assets(tables: TableBundle) -> list[DQFailure]:
 # ---------------------------------------------------------------------------
 @register_rule("DQ-11")
 def dq11_tax_rate_range(tables: TableBundle) -> list[DQFailure]:
+    """DQ-11: flag tax_percentage outside [0, 60]% (WARNING)."""
     failures: list[DQFailure] = []
     df = tables.get("profitandloss")
     if df is None or not _has(df, "tax_percentage"):
@@ -601,6 +610,7 @@ def dq11_tax_rate_range(tables: TableBundle) -> list[DQFailure]:
 # ---------------------------------------------------------------------------
 @register_rule("DQ-12")
 def dq12_dividend_payout_cap(tables: TableBundle) -> list[DQFailure]:
+    """DQ-12: flag dividend_payout > 200% (WARNING)."""
     failures: list[DQFailure] = []
     df = tables.get("profitandloss")
     if df is None or not _has(df, "dividend_payout"):
@@ -639,6 +649,7 @@ _URL_PAT = re.compile(r"^https?://", re.IGNORECASE)
 
 @register_rule("DQ-13")
 def dq13_url_validity(tables: TableBundle) -> list[DQFailure]:
+    """DQ-13: flag Annual_Report URLs that are not valid http(s) links (WARNING)."""
     failures: list[DQFailure] = []
     df = tables.get("documents")
     if df is None or not _has(df, "Annual_Report"):
@@ -671,6 +682,7 @@ def dq13_url_validity(tables: TableBundle) -> list[DQFailure]:
 # ---------------------------------------------------------------------------
 @register_rule("DQ-14")
 def dq14_eps_sign_consistency(tables: TableBundle) -> list[DQFailure]:
+    """DQ-14: flag rows where net_profit>0 but EPS<=0 (WARNING)."""
     failures: list[DQFailure] = []
     df = tables.get("profitandloss")
     if df is None or not _has(df, "eps") or not _has(df, "net_profit"):
@@ -708,6 +720,7 @@ def dq14_eps_sign_consistency(tables: TableBundle) -> list[DQFailure]:
 # ---------------------------------------------------------------------------
 @register_rule("DQ-15")
 def dq15_strict_balance_info(tables: TableBundle) -> list[DQFailure]:
+    """DQ-15: emit one INFO-level record counting rows that balance exactly."""
     df = tables.get("balancesheet")
     if df is None or not _has(df, "total_assets") or not _has(df, "total_liabilities"):
         return []
@@ -737,6 +750,7 @@ def dq15_strict_balance_info(tables: TableBundle) -> list[DQFailure]:
 # ---------------------------------------------------------------------------
 @register_rule("DQ-16")
 def dq16_coverage_check(tables: TableBundle) -> list[DQFailure]:
+    """DQ-16: flag companies with fewer than 5 valid years of PL/BS/CF history (WARNING)."""
     failures: list[DQFailure] = []
     companies = tables.get("companies")
     if companies is None or not _has(companies, "id"):

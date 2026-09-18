@@ -27,7 +27,7 @@ The **Nifty 100 Financial Intelligence Platform** is designed to:
 
 The codebase follows modern Python standards: type hints, modular packages,
 Loguru-structured logging, python-dotenv configuration, Black/Ruff/Pytest gates,
-and a 750+ test suite.
+and a 600+ test suite.
 
 ---
 
@@ -136,6 +136,55 @@ make run-api          # FastAPI via Uvicorn (future endpoint surface)
 make test             # Full pytest suite with coverage
 make lint             # Ruff
 make format           # Black + Ruff --fix
+```
+
+### Running the FastAPI REST API
+
+```bash
+uvicorn src.api.main:app --port 8000 --host 0.0.0.0
+```
+
+Interactive docs at `http://localhost:8000/docs` (Swagger) and
+`http://localhost:8000/redoc`. All endpoints are versioned under `/api/v1/`:
+
+| Endpoint | Purpose |
+|---|---|
+| `GET /api/v1/health` | Server + DB row counts |
+| `GET /api/v1/companies/` | List/filter 92 companies (sector, market-cap, search) |
+| `GET /api/v1/companies/{ticker}` | Company profile + latest KPIs + valuation |
+| `GET /api/v1/companies/{ticker}/pl|bs|cashflow` | Financial-statement history |
+| `GET /api/v1/companies/{ticker}/ratios` | Ratio history |
+| `GET /api/v1/companies/{ticker}/tearsheet` | Download 2-page PDF tearsheet |
+| `GET /api/v1/companies/{ticker}/peers/compare` | Radar chart data vs peers |
+| `GET /api/v1/screener/` | Multi-factor filter (min_roe, max_de, sector, …) |
+| `GET /api/v1/sectors/` | 11 broad sectors with median KPIs |
+| `GET /api/v1/sectors/{sector}/companies` | Per-sector company list |
+| `GET /api/v1/peers/{group}` | Peer-group members with percentile ranks |
+| `GET /api/v1/market-cap/{ticker}` | 6-year market-cap / valuation history |
+| `GET /api/v1/portfolio/stats` | P10/P25/P50/P75/P90/Mean/Std KPIs |
+| `GET /api/v1/portfolio/clusters` | KMeans cluster labels (5 archetypes) |
+| `GET /api/v1/companies/{ticker}/documents` | Annual-report URL list |
+| `GET /export/openapi.json` | Live OpenAPI 3 schema |
+| `GET /export/postman.json` | Postman v2.1 collection |
+
+Example: quality compounders in IT
+```bash
+curl "http://localhost:8000/api/v1/screener/?min_roe=18&sector=Information+Technology"
+```
+
+### Running the test suite
+
+```bash
+pytest tests/ -q       # unit + integration + API + performance tests
+pytest tests/api -q    # API tests only
+pytest tests/perf -v   # performance (10 concurrent screener calls, profile latency, end-to-end server startup)
+pytest tests/ --html=reports/pytest_report.html --self-contained-html
+```
+
+Before committing:
+```bash
+python -m black src/ tests/ scripts/
+python -m ruff check src/ tests/ scripts/ --fix
 ```
 
 ---
@@ -337,7 +386,7 @@ valuation engine.
 
 ## Project Workflow
 
-The platform is developed in four completed sprints (Day 1 through Day 28):
+The platform is developed across six completed sprints (Day 1 through Day 43):
 
 1. **Sprint 1 — Environment & ETL Foundation (Days 1–7):** Scaffolding,
    dependencies, logging, config, 12-dataset loaders, validators, SQLite
@@ -352,8 +401,16 @@ The platform is developed in four completed sprints (Day 1 through Day 28):
    (Home, Profile, Screener, Peers, Trends, Sectors, Capital, Reports),
    sector-relative valuation engine (Caution/Discount/Fair flags), integration
    QA across 92 tickers, README + retro documentation.
+5. **Sprint 5 — PDF Reports & Cashflow Intelligence (Days 29–35):** Per-company
+   tearsheet PDFs, 92-page portfolio summary, sector reports, cashflow
+   intelligence, distress alerts, deleveraging flags, outlier detection.
+6. **Sprint 6 — Clustering, REST API & Sign-off (Days 36–43):** KMeans
+   clustering into 5 archetypes, 16-endpoint FastAPI layer, OpenAPI + Postman
+   export, 607+ pytest tests with an HTML report, performance validation
+   (10 concurrent calls under 10s, profile <3s), end-to-end server launch.
 
-See `docs/standup_updates.md` for per-day notes and `docs/task_board.md` for
+See `docs/standup_updates.md` for per-day notes, `docs/analyst_guide.pdf`
+for a 10-page analyst user guide, and `docs/task_board.md` for
 the sprint backlog status.
 
 ---
@@ -362,7 +419,8 @@ the sprint backlog status.
 
 - **Black** — deterministic formatting (line length 100).
 - **Ruff** — fast linting, import sorting, auto-fixes.
-- **Pytest** — 752 unit + integration tests with coverage gates.
+- **Pytest** — 600+ unit, integration, API and performance tests with
+  HTML report generation (see `reports/pytest_report.html`).
 - **Loguru** — structured, rotating logs in `logs/`.
 - **python-dotenv** — environment-based configuration (`.env.example`
   provided).

@@ -105,6 +105,10 @@ def _project_reports_section() -> None:
 
 
 def render() -> None:
+    """Render the "Reports" dashboard page.
+
+    Shows download buttons for tearsheet / batch / portfolio PDFs.
+    """
     st.title("Reports & Documents")
     st.caption("Annual report PDFs from BSE, plus project-generated Excel reports.")
 

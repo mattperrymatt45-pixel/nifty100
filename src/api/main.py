@@ -200,6 +200,7 @@ def export_postman() -> JSONResponse:
 # ---------------------------------------------------------------------------
 @app.on_event("startup")
 async def on_startup() -> None:
+    """Seed the health router's uptime clock and log application startup."""
     # Seed the health router's uptime clock from this process's start.
     health.set_start_time(time.time())
     logger.info("FastAPI application starting up (version={})", API_VERSION)
@@ -207,6 +208,7 @@ async def on_startup() -> None:
 
 @app.on_event("shutdown")
 async def on_shutdown() -> None:
+    """Log application shutdown."""
     logger.info("FastAPI application shutting down")
 
 

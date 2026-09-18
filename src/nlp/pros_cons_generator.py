@@ -64,12 +64,15 @@ class CompanyContext:
     mc: pd.DataFrame  # market_cap time series, sorted year DESC
 
     def latest_ratios(self) -> pd.Series | None:
+        """Return the most-recent row of financial_ratios for ``company_id``."""
         return self.ratios.iloc[0] if not self.ratios.empty else None
 
     def latest_pl(self) -> pd.Series | None:
+        """Return the most-recent P&L row for ``company_id``."""
         return self.pl.iloc[0] if not self.pl.empty else None
 
     def latest_mc(self) -> pd.Series | None:
+        """Return the most-recent market_cap row for ``company_id``."""
         return self.mc.iloc[0] if not self.mc.empty else None
 
     def ratio_series(self, col: str) -> pd.Series:

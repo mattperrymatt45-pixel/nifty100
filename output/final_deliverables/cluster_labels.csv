@@ -1,0 +1,93 @@
+company_id,company_name,sector,cluster_id,cluster_name,distance_from_centroid
+ADANIENT,Adani Enterprises Ltd,Conglomerates / Other,0,Emerging Growth,2.0916
+ADANIGREEN,Adani Green Energy Ltd,Energy,2,Value Cyclicals,2.2032
+ADANIPORTS,Adani Ports & SEZ Ltd,Industrials,3,High-Quality Compounders,1.5071
+ADANIPOWER,Adani Power Ltd,Energy,2,Value Cyclicals,1.1792
+APOLLOHOSP,Apollo Hospitals Enterprise Ltd,Healthcare,2,Value Cyclicals,1.527
+ASIANPAINT,Asian Paints Ltd,Materials,4,Defensive Dividend Payers,1.1949
+ATGL,Adani Total Gas Ltd,Energy,2,Value Cyclicals,1.2513
+AXISBANK,Axis Bank Ltd,Financials,0,Emerging Growth,0.5673
+BAJAJ-AUTO,Bajaj Auto Ltd,Consumer Discretionary,3,High-Quality Compounders,1.2067
+BAJAJFINSV,Bajaj Finserv Ltd,Financials,3,High-Quality Compounders,1.0476
+BAJAJHLDNG,Bajaj Holdings & Investment,Financials,3,High-Quality Compounders,0.7856
+BAJFINANCE,Bajaj Finance Ltd,Financials,0,Emerging Growth,0.559
+BANDHANBNK,Bandhan Bank Ltd,Financials,4,Defensive Dividend Payers,1.1935
+BANKBARODA,Bank of Baroda,Financials,3,High-Quality Compounders,1.4723
+BERGEPAINT,Berger Paints India Ltd,Materials,0,Emerging Growth,2.3399
+BHARTIARTL,Bharti Airtel Ltd,Communication Services,0,Emerging Growth,1.4188
+BIOCON,Biocon Ltd,Healthcare,0,Emerging Growth,2.3133
+BOSCHLTD,Bosch Ltd,Consumer Discretionary,3,High-Quality Compounders,1.2277
+BPCL,Bharat Petroleum Corporation Ltd,Energy,3,High-Quality Compounders,1.2224
+BRITANNIA,Britannia Industries Ltd,Consumer Staples,0,Emerging Growth,0.5183
+CANBK,Canara Bank,Financials,0,Emerging Growth,0.9187
+CHOLAFIN,Cholamandalam Investment & Finance,Financials,4,Defensive Dividend Payers,1.3304
+CIPLA,Cipla Ltd,Healthcare,2,Value Cyclicals,1.3407
+COALINDIA,Coal India Ltd,Energy,3,High-Quality Compounders,0.8798
+COLPAL,Colgate Palmolive (India) Ltd,Consumer Staples,4,Defensive Dividend Payers,2.7742
+DABUR,Dabur India Ltd,Consumer Staples,2,Value Cyclicals,1.1837
+DIVISLAB,Divi's Laboratories Ltd,Healthcare,2,Value Cyclicals,2.9336
+DLF,DLF Ltd,Real Estate,4,Defensive Dividend Payers,2.1558
+DMART,Avenue Supermarts Ltd,Consumer Discretionary,2,Value Cyclicals,1.9016
+DRREDDY,Dr Reddy's Laboratories Ltd,Healthcare,2,Value Cyclicals,2.2292
+EICHERMOT,Eicher Motors Ltd,Consumer Discretionary,0,Emerging Growth,1.8097
+GAIL,GAIL (India) Ltd,Energy,2,Value Cyclicals,0.778
+GODREJCP,Godrej Consumer Products Ltd,Consumer Staples,0,Emerging Growth,1.8944
+GRASIM,Grasim Industries Ltd,Conglomerates / Other,3,High-Quality Compounders,0.8866
+HAVELLS,Havells India Ltd,Industrials,0,Emerging Growth,1.5501
+HCLTECH,HCL Technologies Ltd,Information Technology,2,Value Cyclicals,1.8694
+HDFCBANK,HDFC Bank Ltd,Financials,0,Emerging Growth,1.1571
+HDFCLIFE,HDFC Life Insurance Co Ltd,Financials,3,High-Quality Compounders,0.7094
+HEROMOTOCO,Hero MotoCorp Ltd,Consumer Discretionary,0,Emerging Growth,1.5332
+HINDALCO,Hindalco Industries Ltd,Materials,0,Emerging Growth,0.6299
+HINDPETRO,Hindustan Petroleum Corp Ltd,Energy,1,Distressed / Turnaround,1.2144
+HINDUNILVR,Hindustan Unilever Ltd,Consumer Staples,2,Value Cyclicals,1.9171
+ICICIBANK,ICICI Bank Ltd,Financials,4,Defensive Dividend Payers,1.4004
+ICICIPRULI,ICICI Prudential Life Insurance,Financials,0,Emerging Growth,1.1773
+INDIGO,InterGlobe Aviation Ltd,Consumer Discretionary,1,Distressed / Turnaround,1.56
+INDUSINDBK,IndusInd Bank Ltd,Financials,3,High-Quality Compounders,1.683
+INFY,Infosys Ltd,Information Technology,2,Value Cyclicals,1.035
+IOC,Indian Oil Corporation Ltd,Energy,0,Emerging Growth,1.7269
+IRCTC,Indian Railway Catering & Tourism,Consumer Discretionary,2,Value Cyclicals,1.0411
+ITC,ITC Ltd,Consumer Staples,2,Value Cyclicals,1.462
+JINDALSTEL,Jindal Steel & Power Ltd,Materials,2,Value Cyclicals,1.8331
+JSWENERGY,JSW Energy Ltd,Energy,0,Emerging Growth,0.8503
+JSWSTEEL,JSW Steel Ltd,Materials,2,Value Cyclicals,2.063
+KOTAKBANK,Kotak Mahindra Bank Ltd,Financials,3,High-Quality Compounders,1.0346
+LICI,Life Insurance Corporation of India,Financials,2,Value Cyclicals,1.3147
+LT,Larsen & Toubro Ltd,Industrials,3,High-Quality Compounders,0.9465
+LTIM,LTIMindtree Ltd,Information Technology,2,Value Cyclicals,1.6741
+M&M,Mahindra & Mahindra Ltd,Consumer Discretionary,0,Emerging Growth,1.3831
+MARICO,Marico Ltd,Consumer Staples,0,Emerging Growth,1.0765
+MARUTI,Maruti Suzuki India Ltd,Consumer Discretionary,0,Emerging Growth,0.9623
+NAUKRI,Info Edge (India) Ltd,Communication Services,1,Distressed / Turnaround,3.0677
+NESTLEIND,Nestle India Ltd,Consumer Staples,3,High-Quality Compounders,2.1917
+NHPC,NHPC Ltd,Energy,0,Emerging Growth,0.9631
+NTPC,NTPC Ltd,Energy,2,Value Cyclicals,1.1691
+OBEROIRLTY,Oberoi Realty Ltd,Real Estate,0,Emerging Growth,1.4522
+ONGC,Oil & Natural Gas Corporation Ltd,Energy,2,Value Cyclicals,1.6886
+PIDILITIND,Pidilite Industries Ltd,Materials,4,Defensive Dividend Payers,1.8465
+PNB,Punjab National Bank,Financials,0,Emerging Growth,0.9424
+POWERGRID,Power Grid Corporation of India,Energy,0,Emerging Growth,1.298
+RELIANCE,Reliance Industries Ltd,Energy,0,Emerging Growth,1.1053
+SBILIFE,SBI Life Insurance Co Ltd,Financials,0,Emerging Growth,1.1645
+SBIN,State Bank of India,Financials,2,Value Cyclicals,1.2609
+SHREECEM,Shree Cement Ltd,Materials,0,Emerging Growth,1.3046
+SHRIRAMFIN,Shriram Finance Ltd,Financials,2,Value Cyclicals,1.615
+SIEMENS,Siemens Ltd,Industrials,3,High-Quality Compounders,1.4348
+SUNPHARMA,Sun Pharmaceutical Industries Ltd,Healthcare,0,Emerging Growth,2.3991
+TATACOMM,Tata Communications Ltd,Communication Services,2,Value Cyclicals,1.4846
+TATACONSUM,Tata Consumer Products Ltd,Consumer Staples,3,High-Quality Compounders,2.3694
+TATAMOTORS,Tata Motors Ltd,Consumer Discretionary,2,Value Cyclicals,1.6471
+TATAPOWER,Tata Power Co Ltd,Energy,1,Distressed / Turnaround,1.0207
+TATASTEEL,Tata Steel Ltd,Materials,2,Value Cyclicals,1.0853
+TCS,Tata Consultancy Services Ltd,Information Technology,2,Value Cyclicals,1.705
+TECHM,Tech Mahindra Ltd,Information Technology,0,Emerging Growth,1.3575
+TITAN,Titan Company Ltd,Consumer Discretionary,0,Emerging Growth,1.4814
+TORNTPHARM,Torrent Pharmaceuticals Ltd,Healthcare,3,High-Quality Compounders,1.2962
+TORNTPOWER,Torrent Power Ltd,Energy,2,Value Cyclicals,1.2737
+TVSMOTOR,TVS Motor Company Ltd,Consumer Discretionary,0,Emerging Growth,1.1677
+ULTRACEMCO,UltraTech Cement Ltd,Materials,0,Emerging Growth,0.6291
+UPL,UPL Ltd,Materials,2,Value Cyclicals,1.8718
+VEDL,Vedanta Ltd,Materials,3,High-Quality Compounders,1.2857
+WIPRO,Wipro Ltd,Information Technology,0,Emerging Growth,0.9757
+ZEEL,Zee Entertainment Enterprises Ltd,Communication Services,0,Emerging Growth,1.5651

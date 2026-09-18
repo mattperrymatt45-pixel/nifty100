@@ -91,6 +91,7 @@ class PatternChangeRow:
     latest_pattern: str
 
     def as_dict(self) -> dict[str, str | None]:
+        """Return the row as a flat dictionary suitable for CSV writing."""
         return {
             "company_id": self.company_id,
             "company_name": self.company_name,

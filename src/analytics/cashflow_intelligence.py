@@ -70,6 +70,7 @@ class DistressAlertRow:
     net_profit_cr: float
 
     def as_dict(self) -> dict:
+        """Return the row as a flat dictionary suitable for CSV writing."""
         return {
             "company_id": self.company_id,
             "company_name": self.company_name,

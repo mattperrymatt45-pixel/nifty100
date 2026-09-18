@@ -1,0 +1,2 @@
+rule_id,table,company_id,year,column,severity,message,expected,actual,row_index,timestamp
+DQ-15,balancesheet,,,"total_assets,total_liabilities",INFO,1284 of 1284 balance sheet rows balance exactly (assets = liabilities),informational counter (flagged in load_audit),1284,,2026-09-18T09:37:07Z

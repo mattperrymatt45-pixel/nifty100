@@ -15,6 +15,7 @@ from src.dashboard.utils.db import get_full_ratios_with_pl
 
 
 def render() -> None:
+    """Render the "Sectors" dashboard page (median-KPI heatmap and sector drill-down)."""
     st.title("Sector Analysis")
     st.caption("Bubble map of revenue vs profitability, sized by market cap.")
 

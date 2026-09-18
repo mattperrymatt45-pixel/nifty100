@@ -72,6 +72,7 @@ def screen_companies(
     max_pe: str | None = Query(None, description="Maximum P/E ratio."),
 ) -> dict:
     # Parse numeric params (400 on invalid)
+    """Return a filtered, ranked list of companies matching the supplied query parameters."""
     f_min_roe = _parse_float("min_roe", min_roe)
     f_max_de = _parse_float("max_de", max_de)
     f_min_fcf = _parse_float("min_fcf", min_fcf)

@@ -25,6 +25,10 @@ PATTERN_COLORS = {
 
 
 def render() -> None:
+    """Render the "Capital Allocation" dashboard page.
+
+    Shows an 8-pattern donut and per-pattern company breakdown.
+    """
     st.title("Capital Allocation Map")
     st.caption(
         "Companies grouped by CFO/CFI/CFF cash-flow pattern. Click a "

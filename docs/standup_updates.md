@@ -1786,3 +1786,58 @@ bottlenecks, and ensure SQLite indexes exist for all hot paths.
 **Test run results:** 199 passed, 1 skipped (live server variant),
 0 failures across tests/api + tests/perf + tests/dq + targeted
 etl/kpi files. Black & Ruff clean. Committed as `[Sprint6-Day43]`.
+
+## Day 44 — Documentation
+
+**Goal:** Complete documentation, finalise docstrings across `src/`,
+refresh the README with API/Sprint-6 instructions, run final code-quality
+gates, and archive all deliverables to `output/final_deliverables/`.
+
+**Deliverables:**
+
+1. **`docs/analyst_guide.pdf`** — 10-page ReportLab-generated analyst user
+   guide with tables, code blocks and page footers:
+   * §1 Platform Overview — ETL/KPI/Analytics/Surfaces layers.
+   * §2 Setup & Launch — prerequisites, install, ETL commands, launching
+     FastAPI (port 8000) and Streamlit (port 8501).
+   * §3 Dashboard Screens — all 8 screens (Home, Profile, Screener, Peers,
+     Trends, Sectors, Capital Allocation, Reports).
+   * §4 Screener Presets — spec §25 preset filter table.
+   * §5 PDF Tearsheets — single, batch, contents; Rs glyph note; paragraph
+     word-wrap.
+   * §6 REST API — curl examples for health, companies, screener, sectors,
+     peers, radar, market-cap, portfolio/stats, portfolio/clusters.
+   * §7 Troubleshooting — 9 common issues with symptoms and fixes.
+   * §8 Test Suite & Quality Gates — pytest/black/ruff commands.
+
+2. **Docstrings complete** — all 267 public functions across `src/` now
+   have one-line docstrings; 31 gaps (on_startup/on_shutdown, dashboard
+   page `render()` functions, all 14 DQ rule functions, screener `preset`,
+   NLP helpers, etc.) filled. Verified programmatically: 0 missing.
+
+3. **`README.md` updated** —
+   * Test count corrected to 600+.
+   * New "Running the FastAPI REST API" section with endpoint table and
+     curl example.
+   * "Running the test suite" section (unit, API, performance, HTML
+     report).
+   * Sprint list extended through Sprint 6 (Clustering/API/Sign-off,
+     Days 36–43).
+   * Reference added to `docs/analyst_guide.pdf`.
+
+4. **Code quality:** `black src/ tests/ scripts/` and `ruff check src/
+   tests/ scripts/ --fix` — clean, 0 issues (fixed E501 on long docstrings
+     and RUF001 en-dash warnings).
+
+5. **Archived 23 deliverables** to `output/final_deliverables/`:
+   valuation_summary.xlsx, valuation_flags.csv, screener_output.xlsx,
+   peer_comparison.xlsx, capital_allocation.csv, capital_allocation_report.xlsx,
+   cashflow_intelligence.xlsx, distress_alerts.csv, cluster_labels.csv,
+   cluster_centroids.csv, cluster_profile.csv, portfolio_stats.csv,
+   outlier_report.csv, validation_failures.csv, load_audit.csv,
+   perf_notes.md, pros_cons_generated.csv, pytest_report.html,
+   correlation_heatmap.png, elbow_plot.png, analyst_guide.pdf,
+   openapi.json, postman_collection.json.
+
+Test run: 199 passed, 1 skipped, 0 failures across api+perf+dq+targeted
+etl/kpi. Committed as `[Sprint6-Day44]`.

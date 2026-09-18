@@ -158,6 +158,7 @@ class ScreenerConfig:
     )
 
     def preset(self, name: str) -> ScreenerPreset:
+        """Apply a named preset filter and return the filtered DataFrame."""
         if name not in self.presets:
             available = ", ".join(sorted(self.presets))
             raise KeyError(f"Unknown screener preset '{name}'. Available: {available}")

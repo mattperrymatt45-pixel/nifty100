@@ -321,6 +321,7 @@ def compute_portfolio_stats(kpi_df: pd.DataFrame) -> pd.DataFrame:
 
 
 def write_portfolio_stats(df: pd.DataFrame, path: Path) -> Path:
+    """Write the portfolio-level percentile summary CSV to ``output/portfolio_stats.csv``."""
     path.parent.mkdir(parents=True, exist_ok=True)
     df.to_csv(path, index=False)
     return path

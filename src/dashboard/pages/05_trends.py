@@ -45,6 +45,7 @@ def _yoy_pct(prev: float, curr: float) -> str | None:
 
 
 def render() -> None:
+    """Render the "Trends" dashboard page (multi-year KPI line charts for the selected ticker)."""
     st.title("Trend Analysis")
     st.caption("10-year multi-metric line chart with YoY % change annotations.")
 

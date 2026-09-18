@@ -113,6 +113,7 @@ class AnalysisParseResult:
 
     @property
     def match_rate_pct(self) -> float:
+        """Return the fuzzy-match percentage for Strengths/Weaknesses sentences."""
         if self.total_rows == 0:
             return 0.0
         return round(self.matched_rows / self.total_rows * 100.0, 2)

@@ -345,6 +345,7 @@ class CapitalAllocationRow:
     pattern_label: str
 
     def as_dict(self) -> dict[str, str]:
+        """Return the row as a flat dictionary suitable for CSV writing."""
         return {
             "company_id": self.company_id,
             "year": self.year,

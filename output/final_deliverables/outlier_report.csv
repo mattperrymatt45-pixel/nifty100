@@ -1,0 +1,2 @@
+company_id,company_name,sector,metric,metric_label,value,sector_mean,z_score
+BAJFINANCE,Bajaj Finance Ltd,Financials,pat_cagr_5yr,PAT CAGR 5yr (%),238.4512,27.1905,3.9074

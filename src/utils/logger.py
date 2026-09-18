@@ -54,6 +54,7 @@ class InterceptHandler(logging.Handler):
     """
 
     def emit(self, record: logging.LogRecord) -> None:  # pragma: no cover - trivial pass-through
+        """Forward a stdlib ``logging`` record to the Loguru sink."""
         try:
             level: str | int = _logger.level(record.levelname).name
         except ValueError:
