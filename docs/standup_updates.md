@@ -1728,3 +1728,61 @@ pytest HTML report showing ≥60 tests with zero failures.
 4. **Black & Ruff clean.**
 
 Committed as `[Sprint6-Day42]`.
+
+## Day 43 — Performance & Integration Testing
+
+**Goal:** Validate API performance under concurrency, verify dashboard
+<-> FastAPI end-to-end startup with no port conflicts, document any
+bottlenecks, and ensure SQLite indexes exist for all hot paths.
+
+**Deliverables:**
+
+1. **`tests/perf/test_performance.py`** — 11 performance / integration
+   tests:
+   * `TestScreenerConcurrency.test_ten_concurrent_screener_calls_finish_under_10s`
+     — fires 10 concurrent requests via ThreadPoolExecutor against the
+     screener endpoint (min_roe=15); asserts wall-clock <10s and each
+     individual call <2s.
+   * `test_ten_concurrent_via_live_server` — same load shape against a
+     live uvicorn on :8000 if one is running (skipped otherwise).
+   * `TestCompanyProfileLatency` — parameterised over 5 tickers (TCS,
+     RELIANCE, HDFCBANK, INFY, ITC). For each ticker it loads the 7
+     endpoints a dashboard profile page would call (profile, P&L, B/S,
+     cashflow, ratios, market-cap, peers/compare) and asserts the total
+     time is <3s. Extra test asserts average latency across all 5 is <1s.
+   * `TestEndToEndStartup.test_start_both_servers_no_port_conflict` —
+     launches `uvicorn src.api.main:app` on :8000 and `streamlit run
+     src/dashboard/app.py` on :8501 as subprocesses, waits for both
+     ports to accept connections, verifies `/api/v1/health` returns 200
+     and `/` on Streamlit returns 200, then shuts them down.
+   * `TestSQLiteIndexes.test_indexes_present` — asserts all expected
+     index names (including the 12 new single-column indexes added by
+     Day 43) exist in the production DB.
+   * `test_perf_notes_written` — re-measures and writes
+     `output/perf_notes.md` with actual timings.
+
+2. **`scripts/day43_indexes.py`** — index-creation script that adds 12
+   single-column indexes on large tables (`company_id` on PL/BS/CF/
+   financial_ratios/documents/market_cap/stock_prices/sectors/peer_groups,
+   plus `year` on PL/BS/CF). These complement the existing composite
+   indexes (`idx_pl_company_year`, etc.) so queries that filter on one
+   column alone (e.g. `WHERE company_id = ?` without a year predicate)
+   also benefit. Runs `ANALYZE` after creation so the query planner has
+   up-to-date stats.
+
+3. **`output/perf_notes.md`** — performance report. Key findings:
+   * 10 concurrent screener calls: **70 ms wall clock**, max single
+     request 58 ms, mean 49 ms — well under the 10 s target.
+   * Profile screen for all 5 tickers: **22-26 ms each**, average 24 ms
+     — well under the 3 s target.
+   * FastAPI binds and serves health in ~1 s; Streamlit serves `/` in
+     ~5-7 s; no port conflicts.
+   * All required indexes present.
+   * Bottleneck identified: screener 4-way join reads 92 rows — fine at
+     this scale; a covering index on (return_on_equity_pct,
+     debt_to_equity, composite_quality_score) is documented as a future
+     optimisation for larger universes but is not needed today.
+
+**Test run results:** 199 passed, 1 skipped (live server variant),
+0 failures across tests/api + tests/perf + tests/dq + targeted
+etl/kpi files. Black & Ruff clean. Committed as `[Sprint6-Day43]`.
