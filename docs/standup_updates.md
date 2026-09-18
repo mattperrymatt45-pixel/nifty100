@@ -1684,3 +1684,47 @@ of final QA.
 
 **Tests run:** `pytest tests/etl/ tests/kpi/ tests/dq/ -v` — 473 passed,
 0 failures. Black-formatted and Ruff-clean.
+
+## Day 42 — API Tests & Integration
+
+**Goal:** Add dedicated HTTP-level tests for every Day-39/40 endpoint and
+verify dashboard ↔ API data consistency. Generate a self-contained
+pytest HTML report showing ≥60 tests with zero failures.
+
+**Deliverables:**
+
+1. **`tests/api/test_health.py`** — 10 tests covering GET /api/v1/health:
+   200 OK, status=ok, version matches API_VERSION, db_row_counts contains
+   all 10 BUSINESS_TABLES, counts are non-negative ints, companies=92,
+   sectors=92, uptime_seconds present, JSON content-type, and the
+   X-Response-Time-Ms header.
+
+2. **`tests/api/test_day42_integration.py`** — 15 cross-cutting
+   integration tests:
+   * Health status + 10 tables (de-duplicated coverage).
+   * GET /companies/ returns count=92 companies.
+   * GET /companies/TCS returns id=TCS, broad_sector=Information Technology,
+     latest_kpis and latest_valuation payloads.
+   * GET /companies/NOSUCHTICKERXYZ → 404.
+   * GET /screener/?min_roe=15 returns only companies with roe_pct ≥ 15
+     (every result is verified); min_roe=25 strictly narrows results;
+     invalid min_roe → HTTP 400.
+   * GET /sectors/ returns count=11 sectors and lists Information Technology.
+   * GET /sectors/Information Technology/companies returns 6 IT names
+     (including TCS).
+   * GET /sectors/NoSuchSector/companies → 404.
+   * Dashboard ↔ API integration: screener engine (`load_screener_dataset`)
+     IDs for min_roe=15 are a subset of API results; direct DB company
+     count matches both /companies and /health; DB per-sector counts
+     match /sectors/ API.
+   * Sanity check that pytest-html is installed for HTML reports.
+
+3. **Pytest HTML report:** `reports/pytest_report.html` (self-contained,
+   570 KB) generated with `pytest ... --html=reports/pytest_report.html
+   --self-contained-html`. Report shows **607 passed, 0 failures, 0
+   skipped** across api, etl, kpi, dq, nlp, analytics and environment
+   test suites.
+
+4. **Black & Ruff clean.**
+
+Committed as `[Sprint6-Day42]`.
