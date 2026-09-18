@@ -1,0 +1,122 @@
+[
+  {
+    "gate": "AC-01",
+    "desc": "SELECT COUNT(*) FROM companies = 92",
+    "status": "PASS",
+    "detail": "count=92"
+  },
+  {
+    "gate": "AC-02",
+    "desc": ">=90% companies have >=10 years of P&L/BS/CF",
+    "status": "PASS",
+    "detail": "profitandloss: 92/92 (100.0%) have >=10y; balancesheet: 92/92 (100.0%) have >=10y; cashflow: 91/92 (98.9%) have >=10y"
+  },
+  {
+    "gate": "AC-03",
+    "desc": "PRAGMA foreign_key_check returns 0 rows",
+    "status": "PASS",
+    "detail": "0 violations"
+  },
+  {
+    "gate": "AC-04",
+    "desc": "financial_ratios >= 1100",
+    "status": "PASS",
+    "detail": "count=1182"
+  },
+  {
+    "gate": "AC-05",
+    "desc": "Revenue CAGR matches manual within 0.1% (TCS 2018-03->2024-03)",
+    "status": "PASS",
+    "detail": "manual=10.047%, db=10.047%"
+  },
+  {
+    "gate": "AC-06",
+    "desc": "ROE matches within 5pp for 5 companies",
+    "status": "PASS",
+    "detail": "all within 5pp"
+  },
+  {
+    "gate": "AC-07",
+    "desc": "Quality screener preset returns 10-50 companies",
+    "status": "PASS",
+    "detail": "11 companies"
+  },
+  {
+    "gate": "AC-08",
+    "desc": "Company Profile loads under 3s",
+    "status": "PASS",
+    "detail": "worst=13ms (TCS)"
+  },
+  {
+    "gate": "AC-09",
+    "desc": "Screener CSV/XLSX download is valid and well-formed",
+    "status": "PASS",
+    "detail": "sheets=['Summary', 'Quality Compounder', 'Value Pick', 'Growth Accelerator', 'Dividend Champion', 'Debt-Free Blue Chip', 'Turnaround Watch'], QC rows=32"
+  },
+  {
+    "gate": "AC-10",
+    "desc": "No text overflow in 5 sampled tearsheets",
+    "status": "PASS",
+    "detail": "OK"
+  },
+  {
+    "gate": "AC-11",
+    "desc": "GET /api/v1/health returns 200",
+    "status": "PASS",
+    "detail": "status=200"
+  },
+  {
+    "gate": "AC-12",
+    "desc": "TCS ratios endpoint returns 10+ years",
+    "status": "PASS",
+    "detail": "rows=14"
+  },
+  {
+    "gate": "AC-13",
+    "desc": "API screener results match screener_output.xlsx",
+    "status": "PASS",
+    "detail": "api=92, xlsx=53, overlap=53"
+  },
+  {
+    "gate": "AC-14",
+    "desc": "peer_percentiles covers all 11 peer groups",
+    "status": "PASS",
+    "detail": "peers=11, pp=11"
+  },
+  {
+    "gate": "AC-15",
+    "desc": "All 92 companies in cluster_labels.csv",
+    "status": "PASS",
+    "detail": "rows=92, unique=92"
+  },
+  {
+    "gate": "AC-16",
+    "desc": "All 92 companies have at least 1 pro and 1 con",
+    "status": "PASS",
+    "detail": "pro=299, con=222"
+  },
+  {
+    "gate": "AC-17",
+    "desc": "92 tearsheet PDFs >=30KB each",
+    "status": "PASS",
+    "detail": "found=92, small=0"
+  },
+  {
+    "gate": "AC-18",
+    "desc": "pytest >= 60 tests, 0 failures",
+    "status": "PASS",
+    "detail": "passed=695, failed=0"
+  },
+  {
+    "gate": "AC-19",
+    "desc": "validation_failures.csv exists with required columns",
+    "status": "PASS",
+    "detail": "cols=['rule_id', 'table', 'company_id', 'year', 'column', 'severity', 'message', 'expected']"
+  },
+  {
+    "gate": "AC-20",
+    "desc": "analyst_guide.pdf >= 10 pages",
+    "status": "PASS",
+    "detail": "pages=10"
+  }
+]

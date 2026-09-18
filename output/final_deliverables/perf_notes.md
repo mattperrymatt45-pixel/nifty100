@@ -1,16 +1,16 @@
 # Performance Notes — Day 43
 
-Generated: 2026-09-18 10:48:12
+Generated: 2026-09-18 11:15:00
 Python: 3.13.14
 Database: SQLite @ db/nifty100.db (92 companies)
 
 ## 1. Screener concurrency — 10 concurrent calls
 Target: all 10 complete within 10 seconds.
 
-* Wall-clock time for 10 concurrent calls: **70 ms** (0.07s)
-* Per-request times (ms): 40, 45, 47, 47, 47, 40, 51, 56, 54, 55
-* Max single request: **56 ms**
-* Mean single request: **48 ms**
+* Wall-clock time for 10 concurrent calls: **124 ms** (0.12s)
+* Per-request times (ms): 66, 82, 83, 79, 91, 90, 96, 111, 102, 107
+* Max single request: **111 ms**
+* Mean single request: **91 ms**
 * Result: **PASS** (under 10s target).
 
 ## 2. Company Profile screen latency (5 tickers, target <3s each)
@@ -19,14 +19,14 @@ market-cap, peers/compare — 7 HTTP calls per ticker.
 
 | Ticker | Time (ms) |
 |--------|-----------|
-| TCS | 27 |
-| RELIANCE | 27 |
-| HDFCBANK | 25 |
-| INFY | 25 |
-| ITC | 25 |
+| TCS | 38 |
+| RELIANCE | 39 |
+| HDFCBANK | 28 |
+| INFY | 26 |
+| ITC | 37 |
 
-* Average profile load: **26 ms**
-* Worst ticker: **RELIANCE = 27 ms**
+* Average profile load: **34 ms**
+* Worst ticker: **RELIANCE = 39 ms**
 * Result: **PASS** (all under 3s).
 
 ## 3. End-to-end server startup

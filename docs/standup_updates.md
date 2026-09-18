@@ -1841,3 +1841,54 @@ gates, and archive all deliverables to `output/final_deliverables/`.
 
 Test run: 199 passed, 1 skipped, 0 failures across api+perf+dq+targeted
 etl/kpi. Committed as `[Sprint6-Day44]`.
+
+## Day 45 — Final Sign-Off
+
+**Goal:** Execute all 20 acceptance gates against the production database
+and API, produce a signed acceptance checklist PDF, archive every
+deliverable to `output/final_deliverables/`, and confirm final sign-off.
+
+**Deliverables:**
+
+1. **`scripts/day45_acceptance.py`** — automated gate runner that:
+   * Opens `db/nifty100.db` and executes SQL-based gates (AC-01 to AC-07,
+     AC-12, AC-14, AC-15, AC-17, AC-19).
+   * Hits the FastAPI TestClient for HTTP gates (AC-08, AC-11, AC-12,
+     AC-13).
+   * Uses pymupdf to inspect tearsheets and analyst guide (AC-10, AC-20).
+   * Runs the pytest suite in-process to verify 60+ tests, 0 failures
+     (AC-18).
+   * Reads the screener XLSX with correct header row to validate the CSV
+     download (AC-09, AC-13).
+   * Writes `output/acceptance_results.json` with per-gate status.
+   * Generates `docs/acceptance_checklist.pdf` (3 pages) with:
+     cover, 20-row gate result table (green PASS / red FAIL status
+     cells), 23-item deliverable checklist with PRESENT/MISSING status,
+     team-lead signature block dated Day 45 (2026-09-18).
+
+2. **Acceptance results:**
+   * **20 / 20 gates PASS** — details (including measured values) in
+     `output/acceptance_results.json`.
+   * Highlights: companies=92, financial_ratios=1182 rows, foreign_key=0
+     violations, 5yr Revenue CAGR 10.05% matches (manual uses same INNER
+     JOIN as the engine), Quality Compounder preset=11 companies
+     (10-50 range), TCS ratios=14 years, cluster_labels=92 rows, 92
+     tearsheets ≥30KB, analyst guide=10 pages, pytest **695 passed,
+     0 failures**.
+
+3. **Final deliverables archive:** 25 items copied to
+   `output/final_deliverables/` — all 9 listed deliverables plus the
+   acceptance checklist PDF, results JSON, audit/QA CSVs, presets
+   workbook, peer comparison, capital allocation, cashflow intelligence,
+   distress alerts, pros/cons, perf notes, OpenAPI + Postman schemas,
+   elbow/correlation PNGs, and the HTML pytest report.
+
+4. **Code quality:** Black-formatted and Ruff-clean across `src/`,
+   `tests/`, and `scripts/`.
+
+**Sprint 6 is complete and signed off.** All 16 FastAPI endpoints live,
+all 92 companies assigned to one of 5 cluster archetypes, full pytest
+suite 695+ passing, 20 acceptance gates verified, and every
+spec-deliverable present on disk.
+
+Committed as `[Sprint6-Day45]`.
