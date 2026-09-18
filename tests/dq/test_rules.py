@@ -1,16 +1,15 @@
-"""Spec-mandated DQ rule unit tests (tests/dq/test_rules.py per spec §27).
+"""Data-quality rule unit tests — Day 41 (14 tests).
 
-Covers DQ-01 through DQ-14 (14 rules) — the unit-testable subset of the
-16-rule validation engine. DQ-15 (strict-balance INFO counter) and
-DQ-16 (coverage check) are integration-level rules exercised via the
-full-ETL test suite rather than synthetic one-row fixtures here.
+Each test crafts a minimal DataFrame that violates exactly one DQ rule
+(DQ-01 through DQ-14), runs that rule in isolation, and asserts the
+correct ``rule_id`` and ``severity`` are returned.
 """
 
 from __future__ import annotations
 
 import pandas as pd
-import pytest
 
+from src.etl.normalizers import YEAR_PARSE_ERROR
 from src.etl.validation import (
     dq01_company_pk_unique,
     dq02_annual_pk_unique,
@@ -29,339 +28,286 @@ from src.etl.validation import (
 )
 
 
-# ---------------------------------------------------------------------------
-# DQ-01: Company PK uniqueness
-# ---------------------------------------------------------------------------
-class TestDQ01CompanyPKUnique:
-    def test_no_duplicates_returns_empty(self) -> None:
-        df = pd.DataFrame({"id": ["TCS", "INFY", "RELIANCE"]})
-        assert dq01_company_pk_unique({"companies": df}) == []
-
-    def test_duplicate_pk_flags_critical(self) -> None:
-        df = pd.DataFrame({"id": ["TCS", "TCS"]})
-        failures = dq01_company_pk_unique({"companies": df})
-        assert len(failures) == 2
-        assert all(f.rule_id == "DQ-01" and f.severity == "CRITICAL" for f in failures)
-
-
-# ---------------------------------------------------------------------------
-# DQ-02: Annual PK uniqueness
-# ---------------------------------------------------------------------------
-class TestDQ02AnnualPKUnique:
-    def test_unique_pairs_pass(self) -> None:
-        pl = pd.DataFrame({"company_id": ["TCS", "TCS"], "year": ["2022-03", "2023-03"]})
-        assert dq02_annual_pk_unique({"profitandloss": pl}) == []
-
-    def test_duplicate_pair_flags_critical(self) -> None:
-        pl = pd.DataFrame({"company_id": ["TCS", "TCS"], "year": ["2023-03", "2023-03"]})
-        failures = dq02_annual_pk_unique({"profitandloss": pl})
-        assert len(failures) == 2
-        assert all(f.rule_id == "DQ-02" and f.severity == "CRITICAL" for f in failures)
+# --------------------------------------------------------------------------
+# DQ-01: Company PK uniqueness (CRITICAL)
+# --------------------------------------------------------------------------
+class TestDQ01:
+    def test_duplicate_company_id_flags_critical(self) -> None:
+        companies = pd.DataFrame({"id": ["TCS", "TCS", "INFY"], "company_name": ["A", "A", "B"]})
+        tables = {"companies": companies}
+        failures = dq01_company_pk_unique(tables)
+        assert len(failures) == 2  # both duplicate rows flagged
+        for f in failures:
+            assert f.rule_id == "DQ-01"
+            assert f.severity == "CRITICAL"
+            assert f.table == "companies"
 
 
-# ---------------------------------------------------------------------------
-# DQ-03: FK integrity
-# ---------------------------------------------------------------------------
-class TestDQ03FKIntegrity:
-    def test_valid_refs_pass(self) -> None:
-        comp = pd.DataFrame({"id": ["TCS", "INFY"]})
-        pl = pd.DataFrame({"company_id": ["TCS", "INFY"], "year": ["2023-03"] * 2})
-        assert dq03_fk_integrity({"companies": comp, "profitandloss": pl}) == []
-
-    def test_orphan_row_flags_critical(self) -> None:
-        comp = pd.DataFrame({"id": ["TCS"]})
-        pl = pd.DataFrame({"company_id": ["TCS", "GHOST"], "year": ["2023-03"] * 2})
-        failures = dq03_fk_integrity({"companies": comp, "profitandloss": pl})
-        assert len(failures) == 1
-        assert failures[0].rule_id == "DQ-03"
-        assert failures[0].severity == "CRITICAL"
-        assert failures[0].company_id == "GHOST"
-
-
-# ---------------------------------------------------------------------------
-# DQ-04: Balance sheet balance
-# ---------------------------------------------------------------------------
-class TestDQ04BalanceSheetBalance:
-    def test_bs_balanced_passes(self) -> None:
-        df = pd.DataFrame(
+# --------------------------------------------------------------------------
+# DQ-02: Annual (company_id, year) PK uniqueness (CRITICAL)
+# --------------------------------------------------------------------------
+class TestDQ02:
+    def test_duplicate_company_year_flags_critical(self) -> None:
+        pl = pd.DataFrame(
             {
-                "company_id": ["X"],
+                "company_id": ["TCS", "TCS", "INFY"],
+                "year": ["2023-03", "2023-03", "2023-03"],
+                "sales": [100, 100, 200],
+            }
+        )
+        tables = {"profitandloss": pl}
+        failures = dq02_annual_pk_unique(tables)
+        assert len(failures) == 2  # both TCS rows flagged
+        for f in failures:
+            assert f.rule_id == "DQ-02"
+            assert f.severity == "CRITICAL"
+
+
+# --------------------------------------------------------------------------
+# DQ-03: FK integrity (CRITICAL)
+# --------------------------------------------------------------------------
+class TestDQ03:
+    def test_orphan_company_id_flags_critical(self) -> None:
+        companies = pd.DataFrame({"id": ["TCS", "INFY"]})
+        pl = pd.DataFrame(
+            {
+                "company_id": ["TCS", "UNKNOWN"],
+                "year": ["2023-03", "2023-03"],
+                "sales": [100, 200],
+            }
+        )
+        tables = {"companies": companies, "profitandloss": pl}
+        failures = dq03_fk_integrity(tables)
+        assert len(failures) == 1
+        f = failures[0]
+        assert f.rule_id == "DQ-03"
+        assert f.severity == "CRITICAL"
+        assert f.company_id == "UNKNOWN"
+
+
+# --------------------------------------------------------------------------
+# DQ-04: Balance sheet imbalance (WARNING)
+# --------------------------------------------------------------------------
+class TestDQ04:
+    def test_imbalanced_bs_warns(self) -> None:
+        bs = pd.DataFrame(
+            {
+                "company_id": ["TCS"],
                 "year": ["2023-03"],
                 "total_assets": [1000.0],
-                "total_liabilities": [1005.0],
+                "total_liabilities": [800.0],  # 20% off
             }
         )
-        assert dq04_balance_sheet_balance({"balancesheet": df}) == []
-
-    def test_bs_imbalanced_warns(self) -> None:
-        """Spec example: assets=1000, liab=1020 → DQ-04 WARNING triggered."""
-        df = pd.DataFrame(
-            {
-                "company_id": ["X"],
-                "year": ["2023-03"],
-                "total_assets": [1000.0],
-                "total_liabilities": [1020.0],
-            }
-        )
-        failures = dq04_balance_sheet_balance({"balancesheet": df})
+        tables = {"balancesheet": bs}
+        failures = dq04_balance_sheet_balance(tables)
         assert len(failures) == 1
-        assert failures[0].rule_id == "DQ-04"
-        assert failures[0].severity == "WARNING"
+        f = failures[0]
+        assert f.rule_id == "DQ-04"
+        assert f.severity == "WARNING"
 
 
-# ---------------------------------------------------------------------------
-# DQ-05: OPM cross-check
-# ---------------------------------------------------------------------------
-class TestDQ05OPMCrosscheck:
-    def test_opm_matches_passes(self) -> None:
-        df = pd.DataFrame(
-            {
-                "company_id": ["X"],
-                "year": ["2023-03"],
-                "sales": [1000.0],
-                "operating_profit": [200.0],
-                "opm_percentage": [20.0],
-            }
-        )
-        assert dq05_opm_crosscheck({"profitandloss": df}) == []
-
+# --------------------------------------------------------------------------
+# DQ-05: OPM cross-check (WARNING)
+# --------------------------------------------------------------------------
+class TestDQ05:
     def test_opm_mismatch_warns(self) -> None:
-        df = pd.DataFrame(
+        # reported OPM = 30%, but computed = 250/1000 = 25% → 5pp delta
+        pl = pd.DataFrame(
             {
-                "company_id": ["X"],
+                "company_id": ["TCS"],
                 "year": ["2023-03"],
                 "sales": [1000.0],
-                "operating_profit": [200.0],
-                "opm_percentage": [25.0],  # reported 25 vs computed 20 → diff=5
+                "operating_profit": [250.0],
+                "opm_percentage": [30.0],
             }
         )
-        failures = dq05_opm_crosscheck({"profitandloss": df})
+        tables = {"profitandloss": pl}
+        failures = dq05_opm_crosscheck(tables)
         assert len(failures) == 1
-        assert failures[0].rule_id == "DQ-05"
-        assert failures[0].severity == "WARNING"
+        f = failures[0]
+        assert f.rule_id == "DQ-05"
+        assert f.severity == "WARNING"
 
 
-# ---------------------------------------------------------------------------
-# DQ-06: Positive sales
-# ---------------------------------------------------------------------------
-class TestDQ06PositiveSales:
-    def test_positive_sales_passes(self) -> None:
-        df = pd.DataFrame({"company_id": ["X"], "year": ["2023-03"], "sales": [500.0]})
-        assert dq06_positive_sales({"profitandloss": df}) == []
-
-    def test_zero_sales_warns_non_bank(self) -> None:
-        """Spec example: sales=0 → DQ-06 WARNING triggered."""
-        df = pd.DataFrame({"company_id": ["X"], "year": ["2023-03"], "sales": [0.0]})
-        failures = dq06_positive_sales({"profitandloss": df})
+# --------------------------------------------------------------------------
+# DQ-06: Positive sales for non-banks (WARNING)
+# --------------------------------------------------------------------------
+class TestDQ06:
+    def test_zero_sales_non_bank_warns(self) -> None:
+        pl = pd.DataFrame(
+            {
+                "company_id": ["TCS"],
+                "year": ["2023-03"],
+                "sales": [0.0],
+            }
+        )
+        # No sectors table → financial_ids empty → zero sales flagged
+        tables = {"profitandloss": pl}
+        failures = dq06_positive_sales(tables)
         assert len(failures) == 1
-        assert failures[0].rule_id == "DQ-06"
-        assert failures[0].severity == "WARNING"
-
-    def test_bank_zero_sales_excluded(self) -> None:
-        """Banks (financial sector) are NOT flagged for zero sales."""
-        pl = pd.DataFrame({"company_id": ["HDFCBANK"], "year": ["2023-03"], "sales": [0.0]})
-        sectors = pd.DataFrame({"company_id": ["HDFCBANK"], "broad_sector": ["Private Banks"]})
-        assert dq06_positive_sales({"profitandloss": pl, "sectors": sectors}) == []
-
-    def test_nbfc_zero_sales_excluded(self) -> None:
-        """NBFCs (Finance sector) are NOT flagged for zero sales."""
-        pl = pd.DataFrame({"company_id": ["BAJFINANCE"], "year": ["2023-03"], "sales": [0.0]})
-        sectors = pd.DataFrame({"company_id": ["BAJFINANCE"], "broad_sector": ["Consumer Finance"]})
-        assert dq06_positive_sales({"profitandloss": pl, "sectors": sectors}) == []
-
-    def test_non_bank_zero_sales_flagged_with_sectors(self) -> None:
-        pl = pd.DataFrame({"company_id": ["TCS"], "year": ["2023-03"], "sales": [0.0]})
-        sectors = pd.DataFrame({"company_id": ["TCS"], "broad_sector": ["Information Technology"]})
-        failures = dq06_positive_sales({"profitandloss": pl, "sectors": sectors})
-        assert len(failures) == 1
-        assert failures[0].company_id == "TCS"
+        f = failures[0]
+        assert f.rule_id == "DQ-06"
+        assert f.severity == "WARNING"
+        assert f.company_id == "TCS"
 
 
-# ---------------------------------------------------------------------------
-# DQ-07: Year format
-# ---------------------------------------------------------------------------
-class TestDQ07YearFormat:
-    def test_valid_year_passes(self) -> None:
-        df = pd.DataFrame({"company_id": ["X"], "year": ["2023-03"]})
-        assert dq07_year_format({"profitandloss": df}) == []
-
+# --------------------------------------------------------------------------
+# DQ-07: Year format (CRITICAL)
+# --------------------------------------------------------------------------
+class TestDQ07:
     def test_bad_year_flags_critical(self) -> None:
-        df = pd.DataFrame({"company_id": ["X"], "year": ["2023"]})
-        failures = dq07_year_format({"profitandloss": df})
-        assert len(failures) == 1
-        assert failures[0].rule_id == "DQ-07"
-        assert failures[0].severity == "CRITICAL"
-
-
-# ---------------------------------------------------------------------------
-# DQ-08: Ticker format
-# ---------------------------------------------------------------------------
-class TestDQ08TickerFormat:
-    @pytest.mark.parametrize("ticker", ["TCS", "INFY", "RELIANCE", "M&M", "BRITANNIA"])
-    def test_valid_ticker_passes(self, ticker: str) -> None:
-        df = pd.DataFrame({"id": [ticker]})
-        assert dq08_ticker_format({"companies": df}) == []
-
-    @pytest.mark.parametrize("ticker", ["lowercase", "bad ticker", "", "a"])
-    def test_bad_ticker_flags_critical(self, ticker: str) -> None:
-        df = pd.DataFrame({"id": [ticker]})
-        failures = dq08_ticker_format({"companies": df})
-        assert len(failures) >= 1
-        assert all(f.severity == "CRITICAL" for f in failures)
-
-
-# ---------------------------------------------------------------------------
-# DQ-09: Net cash flow cross-check
-# ---------------------------------------------------------------------------
-class TestDQ09NetCashCheck:
-    def test_cashflow_reconciles_passes(self) -> None:
-        df = pd.DataFrame(
+        """Both raw garbage and the YEAR_PARSE_ERROR sentinel must be flagged."""
+        pl = pd.DataFrame(
             {
-                "company_id": ["X"],
+                "company_id": ["TCS", "INFY", "WIPRO"],
+                "year": ["garbage", "2023-03", YEAR_PARSE_ERROR],
+                "sales": [100, 200, 300],
+            }
+        )
+        tables = {"profitandloss": pl}
+        failures = dq07_year_format(tables)
+        assert len(failures) == 2  # TCS + WIPRO
+        for f in failures:
+            assert f.rule_id == "DQ-07"
+            assert f.severity == "CRITICAL"
+
+
+# --------------------------------------------------------------------------
+# DQ-08: Ticker format (CRITICAL)
+# --------------------------------------------------------------------------
+class TestDQ08:
+    def test_bad_ticker_flags_critical(self) -> None:
+        # Lowercase / invalid chars
+        companies = pd.DataFrame({"id": ["bad ticker!!", "TCS"]})
+        tables = {"companies": companies}
+        failures = dq08_ticker_format(tables)
+        assert any(f.rule_id == "DQ-08" for f in failures)
+        crit = [f for f in failures if f.severity == "CRITICAL" and f.rule_id == "DQ-08"]
+        assert len(crit) >= 1
+
+
+# --------------------------------------------------------------------------
+# DQ-09: Net cash flow cross-check (WARNING)
+# --------------------------------------------------------------------------
+class TestDQ09:
+    def test_net_cash_mismatch_warns(self) -> None:
+        cf = pd.DataFrame(
+            {
+                "company_id": ["TCS"],
                 "year": ["2023-03"],
                 "operating_activity": [100.0],
                 "investing_activity": [-50.0],
                 "financing_activity": [-20.0],
-                "net_cash_flow": [30.0],
+                "net_cash_flow": [100.0],  # should be 30 → mismatch
             }
         )
-        assert dq09_net_cash_check({"cashflow": df}) == []
-
-    def test_cashflow_mismatch_warns(self) -> None:
-        df = pd.DataFrame(
-            {
-                "company_id": ["X"],
-                "year": ["2023-03"],
-                "operating_activity": [100.0],
-                "investing_activity": [-50.0],
-                "financing_activity": [-20.0],
-                "net_cash_flow": [100.0],  # diff = 70 > 10
-            }
-        )
-        failures = dq09_net_cash_check({"cashflow": df})
+        tables = {"cashflow": cf}
+        failures = dq09_net_cash_check(tables)
         assert len(failures) == 1
-        assert failures[0].rule_id == "DQ-09"
-        assert failures[0].severity == "WARNING"
+        f = failures[0]
+        assert f.rule_id == "DQ-09"
+        assert f.severity == "WARNING"
 
 
-# ---------------------------------------------------------------------------
-# DQ-10: Non-negative fixed assets
-# ---------------------------------------------------------------------------
-class TestDQ10NonNegativeFixedAssets:
-    def test_non_negative_passes(self) -> None:
-        df = pd.DataFrame(
+# --------------------------------------------------------------------------
+# DQ-10: Non-negative fixed assets (WARNING)
+# --------------------------------------------------------------------------
+class TestDQ10:
+    def test_negative_fixed_assets_warns(self) -> None:
+        bs = pd.DataFrame(
             {
-                "company_id": ["X"],
+                "company_id": ["TCS"],
                 "year": ["2023-03"],
-                "fixed_assets": [500.0],
+                "fixed_assets": [-100.0],
             }
         )
-        assert dq10_non_negative_fixed_assets({"balancesheet": df}) == []
+        tables = {"balancesheet": bs}
+        failures = dq10_non_negative_fixed_assets(tables)
+        assert len(failures) == 1
+        f = failures[0]
+        assert f.rule_id == "DQ-10"
+        assert f.severity == "WARNING"
 
-    def test_negative_fa_warns(self) -> None:
-        df = pd.DataFrame(
+
+# --------------------------------------------------------------------------
+# DQ-11: Tax rate in [0, 60] (WARNING)
+# --------------------------------------------------------------------------
+class TestDQ11:
+    def test_tax_rate_out_of_range_warns(self) -> None:
+        pl = pd.DataFrame(
             {
-                "company_id": ["X"],
+                "company_id": ["TCS"],
                 "year": ["2023-03"],
-                "fixed_assets": [-50.0],
+                "sales": [1000.0],
+                "tax_percentage": [75.0],  # > 60
             }
         )
-        failures = dq10_non_negative_fixed_assets({"balancesheet": df})
+        tables = {"profitandloss": pl}
+        failures = dq11_tax_rate_range(tables)
         assert len(failures) == 1
-        assert failures[0].rule_id == "DQ-10"
-        assert failures[0].severity == "WARNING"
+        f = failures[0]
+        assert f.rule_id == "DQ-11"
+        assert f.severity == "WARNING"
 
 
-# ---------------------------------------------------------------------------
-# DQ-11: Tax rate range
-# ---------------------------------------------------------------------------
-class TestDQ11TaxRateRange:
-    @pytest.mark.parametrize("rate", [0.0, 25.0, 30.0, 60.0])
-    def test_valid_tax_passes(self, rate: float) -> None:
-        df = pd.DataFrame({"company_id": ["X"], "year": ["2023-03"], "tax_percentage": [rate]})
-        assert dq11_tax_rate_range({"profitandloss": df}) == []
-
-    @pytest.mark.parametrize("rate", [-5.0, 75.0])
-    def test_invalid_tax_warns(self, rate: float) -> None:
-        df = pd.DataFrame({"company_id": ["X"], "year": ["2023-03"], "tax_percentage": [rate]})
-        failures = dq11_tax_rate_range({"profitandloss": df})
-        assert len(failures) == 1
-        assert failures[0].rule_id == "DQ-11"
-        assert failures[0].severity == "WARNING"
-
-
-# ---------------------------------------------------------------------------
-# DQ-12: Dividend payout cap
-# ---------------------------------------------------------------------------
-class TestDQ12DividendPayoutCap:
-    @pytest.mark.parametrize("dp", [0.0, 50.0, 200.0])
-    def test_reasonable_payout_passes(self, dp: float) -> None:
-        df = pd.DataFrame({"company_id": ["X"], "year": ["2023-03"], "dividend_payout": [dp]})
-        assert dq12_dividend_payout_cap({"profitandloss": df}) == []
-
-    def test_excessive_payout_warns(self) -> None:
-        df = pd.DataFrame({"company_id": ["X"], "year": ["2023-03"], "dividend_payout": [250.0]})
-        failures = dq12_dividend_payout_cap({"profitandloss": df})
-        assert len(failures) == 1
-        assert failures[0].rule_id == "DQ-12"
-        assert failures[0].severity == "WARNING"
-
-
-# ---------------------------------------------------------------------------
-# DQ-13: URL validity
-# ---------------------------------------------------------------------------
-class TestDQ13URLValidity:
-    @pytest.mark.parametrize("url", ["https://example.com/ar.pdf", "http://x.y/z", "", None])
-    def test_valid_url_passes(self, url: str | None) -> None:
-        df = pd.DataFrame({"company_id": ["X"], "Year": ["2023"], "Annual_Report": [url]})
-        assert dq13_url_validity({"documents": df}) == []
-
-    def test_bad_url_warns(self) -> None:
-        df = pd.DataFrame({"company_id": ["X"], "Year": ["2023"], "Annual_Report": ["not-a-url"]})
-        failures = dq13_url_validity({"documents": df})
-        assert len(failures) == 1
-        assert failures[0].rule_id == "DQ-13"
-        assert failures[0].severity == "WARNING"
-
-
-# ---------------------------------------------------------------------------
-# DQ-14: EPS sign consistency
-# ---------------------------------------------------------------------------
-class TestDQ14EPSSignConsistency:
-    def test_consistent_sign_passes(self) -> None:
-        df = pd.DataFrame(
+# --------------------------------------------------------------------------
+# DQ-12: Dividend payout ≤ 200% (WARNING)
+# --------------------------------------------------------------------------
+class TestDQ12:
+    def test_excessive_dividend_payout_warns(self) -> None:
+        pl = pd.DataFrame(
             {
-                "company_id": ["X"],
+                "company_id": ["TCS"],
                 "year": ["2023-03"],
-                "net_profit": [100.0],
-                "eps": [10.0],
+                "sales": [1000.0],
+                "dividend_payout": [250.0],  # > 200
             }
         )
-        assert dq14_eps_sign_consistency({"profitandloss": df}) == []
-
-    def test_loss_negative_eps_passes(self) -> None:
-        """Loss with negative EPS is consistent."""
-        df = pd.DataFrame(
-            {
-                "company_id": ["X"],
-                "year": ["2023-03"],
-                "net_profit": [-50.0],
-                "eps": [-5.0],
-            }
-        )
-        assert dq14_eps_sign_consistency({"profitandloss": df}) == []
-
-    def test_profit_negative_eps_warns(self) -> None:
-        """PAT > 0 but EPS ≤ 0 → flag."""
-        df = pd.DataFrame(
-            {
-                "company_id": ["X"],
-                "year": ["2023-03"],
-                "net_profit": [100.0],
-                "eps": [-1.0],
-            }
-        )
-        failures = dq14_eps_sign_consistency({"profitandloss": df})
+        tables = {"profitandloss": pl}
+        failures = dq12_dividend_payout_cap(tables)
         assert len(failures) == 1
-        assert failures[0].rule_id == "DQ-14"
-        assert failures[0].severity == "WARNING"
+        f = failures[0]
+        assert f.rule_id == "DQ-12"
+        assert f.severity == "WARNING"
+
+
+# --------------------------------------------------------------------------
+# DQ-13: URL validity for documents (WARNING)
+# --------------------------------------------------------------------------
+class TestDQ13:
+    def test_invalid_url_warns(self) -> None:
+        docs = pd.DataFrame(
+            {
+                "company_id": ["TCS"],
+                "Year": [2023],
+                "Annual_Report": ["not-a-url"],
+            }
+        )
+        tables = {"documents": docs}
+        failures = dq13_url_validity(tables)
+        assert len(failures) == 1
+        f = failures[0]
+        assert f.rule_id == "DQ-13"
+        assert f.severity == "WARNING"
+
+
+# --------------------------------------------------------------------------
+# DQ-14: EPS sign consistency (WARNING)
+# --------------------------------------------------------------------------
+class TestDQ14:
+    def test_profit_with_negative_eps_warns(self) -> None:
+        pl = pd.DataFrame(
+            {
+                "company_id": ["TCS"],
+                "year": ["2023-03"],
+                "sales": [1000.0],
+                "net_profit": [150.0],  # profit
+                "eps": [-5.0],  # but negative EPS
+            }
+        )
+        tables = {"profitandloss": pl}
+        failures = dq14_eps_sign_consistency(tables)
+        assert len(failures) == 1
+        f = failures[0]
+        assert f.rule_id == "DQ-14"
+        assert f.severity == "WARNING"

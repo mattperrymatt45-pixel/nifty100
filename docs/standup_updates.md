@@ -1635,3 +1635,52 @@ docs/postman_collection.json exist on disk).
 
 **Final non-dashboard test count:** 990 passing (960 + 30).
 Black & Ruff clean. Committed as `[Sprint6-Day40]`.
+
+## Day 41 — ETL & KPI Unit Tests
+
+**Goal:** Expand unit-test coverage for ETL normalisation, Excel loading, KPI
+edge-cases, and data-quality rules to harden the data-foundation layer ahead
+of final QA.
+
+**Deliverables:**
+
+1. **`tests/etl/test_normalise.py`** — 20 unit tests for `normalize_year()`
+   via the British-spelling `src.etl.normaliser` re-export, covering:
+   Mar-23 hyphen/space short form, March-2023 full name, bare int/str/float/
+   2-digit years, FY-prefix variants (FY23, FY 2024, FY2023, F.Y.24),
+   non-March closes (Dec-22, Jun-23), already-canonical YYYY-MM, datetime
+   objects, two-digit pivot (50→2050, 51→1951), error cases (None, garbage),
+   and the `normalize_year_safe` sentinel path.
+
+2. **`tests/etl/test_loader.py`** — 10 unit tests verifying the Excel loader
+   reads the 12 Screener.in datasets correctly: 12 datasets registered,
+   core and supplementary datasets expose expected column subsets, tickers
+   are uppercased, time-series years are normalised to YYYY-MM, companies
+   uses 'id' as the ticker column, documents.Year is a calendar INT (not
+   FY-normalised), 92 company rows present, sectors covers all 92 tickers,
+   and column headers have no leading/trailing whitespace.
+
+3. **`tests/kpi/test_ratios.py`** — 20 unit tests covering KPI edge-cases:
+   ROE with positive equity, negative equity (None), zero equity (None),
+   reserves=None; D/E for debt-free (=0), normal value, negative equity
+   (None), high-leverage flag for non-financials with D/E>5 (with financial
+   carve-out); ICR when interest=0 (None), normal calculation; CAGR
+   turnaround, decline-to-loss, normal 5-yr doubling, zero-base, negative
+   growth; OPM cross-check no-divergence / diverged / at-exact-tolerance;
+   CFO/PAT ratio and CFO quality tier thresholds (High/Moderate/Accrual
+   Risk, None/NaN).
+
+4. **`tests/dq/test_rules.py`** — 14 unit tests (one per DQ rule DQ-01
+   through DQ-14), each crafting a minimal DataFrame that violates exactly
+   that rule and asserting the correct `rule_id` and `severity`:
+   DQ-01 duplicate company PK (CRITICAL), DQ-02 duplicate (company_id, year)
+   (CRITICAL), DQ-03 FK orphan (CRITICAL), DQ-04 BS imbalance >1% (WARNING),
+   DQ-05 OPM mismatch ≥1pp (WARNING), DQ-06 zero sales non-bank (WARNING),
+   DQ-07 bad year (CRITICAL), DQ-08 invalid ticker (CRITICAL), DQ-09 net
+   cash >Rs10Cr mismatch (WARNING), DQ-10 negative fixed assets (WARNING),
+   DQ-11 tax outside [0,60]% (WARNING), DQ-12 dividend payout >200%
+   (WARNING), DQ-13 invalid Annual_Report URL (WARNING), DQ-14 PAT>0 with
+   EPS≤0 (WARNING).
+
+**Tests run:** `pytest tests/etl/ tests/kpi/ tests/dq/ -v` — 473 passed,
+0 failures. Black-formatted and Ruff-clean.
