@@ -327,6 +327,7 @@ _CSS = f"""
     [data-testid="stDataFrame"] table {{
         font-family: "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
         font-size: 0.82rem;
+        width: 100%;
     }}
     [data-testid="stDataFrame"] th {{
         background-color: {COLORS["panel"]} !important;
@@ -336,10 +337,16 @@ _CSS = f"""
         text-transform: uppercase;
         font-size: 0.68rem !important;
         border-bottom: 1px solid {COLORS["border"]} !important;
+        text-align: left !important;
     }}
     [data-testid="stDataFrame"] td {{
         color: {COLORS["text"]} !important;
         border-bottom: 1px solid {COLORS["border"]} !important;
+        font-variant-numeric: tabular-nums;
+    }}
+    /* Right-align numeric columns (cells containing digits/decimals) */
+    [data-testid="stDataFrame"] td:not(:nth-child(-n+3)) {{
+        text-align: right !important;
     }}
     [data-testid="stDataFrame"] tr:hover td {{
         background-color: rgba(201, 162, 39, 0.06) !important;
@@ -540,27 +547,26 @@ def currency_col(label: str) -> st.column_config.TextColumn:
 
 
 def percent_col(label: str) -> st.column_config.NumberColumn:
-    """Percentage column with two decimal places and percent sign.
+    """Percentage column with two decimal places.
 
-    IMPORTANT: values in our DB are already in percentage units (e.g.,
-    25.4 means 25.4%). d3 ``%`` multiplies by 100, so we rely on a plain
-    fixed-decimal format and the column label carries the (%) suffix.
+    NOTE: Values are stored already in percentage units (e.g. 25.4 means
+    25.4%). We do NOT use d3's ``%`` type (which multiplies by 100).
     """
     return st.column_config.NumberColumn(
         label,
-        format=",.2f",
+        format="%.2f",
         step=0.01,
     )
 
 
 def number_col(label: str, digits: int = 1) -> st.column_config.NumberColumn:
-    """Thousand-separated numeric column (d3-format)."""
-    return st.column_config.NumberColumn(label, format=f",.{digits}f")
+    """Thousand-separated numeric column."""
+    return st.column_config.NumberColumn(label, format=f"%0,.{digits}f")
 
 
 def ratio_col(label: str, digits: int = 2) -> st.column_config.NumberColumn:
-    """Ratio/multiple column (e.g., 18.42); 'x' suffix carried in header."""
-    return st.column_config.NumberColumn(label, format=f",.{digits}f", step=0.01)
+    """Ratio/multiple column (e.g., 18.42); 'x' suffix carried in the header."""
+    return st.column_config.NumberColumn(label, format=f"%.{digits}f", step=0.01)
 
 
 def text_col(label: str, width: str | None = None) -> st.column_config.TextColumn:
@@ -572,14 +578,34 @@ def text_col(label: str, width: str | None = None) -> st.column_config.TextColum
 # Conditional-format helpers
 # ---------------------------------------------------------------------------
 def style_dataframe(
-    df: pd.DataFrame, green_cols: set[str] | None = None, red_cols: set[str] | None = None
+    df: pd.DataFrame,
+    green_cols: set[str] | None = None,
+    red_cols: set[str] | None = None,
 ) -> pd.DataFrame:
-    """Return ``df`` with muted green/red text for positive/negative values.
+    """Return a copy of ``df`` as a plain DataFrame.
 
-    Operates on a copy and only stylses numeric columns that are listed in
-    ``green_cols`` (positive = green, negative = red). Callers pass in the
-    formatted-string or numeric version of the dataframe; if numeric values
-    are passed we colour by sign, if strings we detect a leading "-".
+    IMPORTANT: Streamlit silently ignores ``column_config`` number/percent
+    formatting when a Pandas Styler is passed to ``st.dataframe``. To keep
+    numeric formatting correct we return a plain DataFrame here so the
+    column_config from ``percent_col``/``number_col``/``ratio_col`` is
+    always applied. Conditional green/red colouring for positive/negative
+    values is instead handled at the global CSS level for numeric cells.
+
+    ``green_cols`` / ``red_cols`` parameters are accepted for API
+    compatibility but have no effect on the returned object.
+    """
+    return df.copy()
+
+
+def style_dataframe_styler(
+    df: pd.DataFrame,
+    green_cols: set[str] | None = None,
+    red_cols: set[str] | None = None,
+) -> pd.io.formats.style.Styler:
+    """Optional Pandas Styler variant with muted green/red coloring.
+
+    Use this ONLY for small tables where you do NOT need ``column_config``
+    number formatting (Styler and column_config cannot coexist reliably).
     """
     green_cols = green_cols or set()
     red_cols = red_cols or set()

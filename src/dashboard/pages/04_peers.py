@@ -15,13 +15,9 @@ from src.dashboard.utils.theme import (
     CHART_GOLD,
     COLORS,
     app_stamp,
-    number_col,
     page_header,
-    percent_col,
     plotly_chart,
-    ratio_col,
     section_label,
-    text_col,
 )
 
 RADAR_AXES = [
@@ -123,28 +119,67 @@ def _build_radar(group_df: pd.DataFrame, ticker: str, group_name: str) -> go.Fig
     return fig
 
 
+def _fmt(v: object, pct: bool = False, ratio: bool = False, digits: int = 1) -> str:
+    """Format a numeric value as a string with thousand separators.
+
+    Used when rendering tables through a Pandas Styler (which is
+    incompatible with Streamlit column_config number formatting).
+    """
+    if v is None or pd.isna(v):
+        return "-"
+    n = float(v)
+    if pct:
+        return f"{n:,.{digits}f}%"
+    if ratio:
+        return f"{n:,.{digits}f}x"
+    return f"{n:,.{digits}f}"
+
+
 def _kpi_table(group_df: pd.DataFrame) -> None:
-    """KPI table with benchmark row highlighted in gold."""
-    display = group_df[
-        [
-            "ticker",
-            "company_name",
-            "is_benchmark",
-            "roe_pct",
-            "roce_pct",
-            "npm_pct",
-            "de",
-            "icr",
-            "fcf_cr",
-            "rev_cagr_5yr",
-            "pat_cagr_5yr",
-            "composite",
-            "pe_ratio",
-            "pb_ratio",
-            "div_yield_pct",
-        ]
-    ].copy()
-    display.columns = [
+    """KPI table with benchmark row highlighted in gold.
+
+    We pre-format numeric columns as strings and apply the gold highlight
+    via Pandas Styler.  Styler and ``column_config`` cannot coexist in
+    Streamlit, so all formatting (commas, percent signs, 'x' multiples)
+    is done here instead of through ``column_config``.
+    """
+    cols = [
+        "ticker",
+        "company_name",
+        "is_benchmark",
+        "roe_pct",
+        "roce_pct",
+        "npm_pct",
+        "de",
+        "icr",
+        "fcf_cr",
+        "rev_cagr_5yr",
+        "pat_cagr_5yr",
+        "composite",
+        "pe_ratio",
+        "pb_ratio",
+        "div_yield_pct",
+    ]
+    d = group_df[cols].copy()
+
+    # Pre-format every numeric column
+    d["ticker"] = d["ticker"].astype(str)
+    d["company_name"] = d["company_name"].astype(str)
+    d["is_benchmark"] = d["is_benchmark"].map(lambda v: "B" if v == 1 else "")
+    d["roe_pct"] = d["roe_pct"].map(lambda v: _fmt(v, pct=True, digits=2))
+    d["roce_pct"] = d["roce_pct"].map(lambda v: _fmt(v, pct=True, digits=2))
+    d["npm_pct"] = d["npm_pct"].map(lambda v: _fmt(v, pct=True, digits=2))
+    d["de"] = d["de"].map(lambda v: _fmt(v, digits=2))
+    d["icr"] = d["icr"].map(lambda v: _fmt(v, digits=2))
+    d["fcf_cr"] = d["fcf_cr"].map(lambda v: _fmt(v, digits=0))
+    d["rev_cagr_5yr"] = d["rev_cagr_5yr"].map(lambda v: _fmt(v, pct=True, digits=2))
+    d["pat_cagr_5yr"] = d["pat_cagr_5yr"].map(lambda v: _fmt(v, pct=True, digits=2))
+    d["composite"] = d["composite"].map(lambda v: _fmt(v, digits=1))
+    d["pe_ratio"] = d["pe_ratio"].map(lambda v: _fmt(v, ratio=True, digits=2))
+    d["pb_ratio"] = d["pb_ratio"].map(lambda v: _fmt(v, ratio=True, digits=2))
+    d["div_yield_pct"] = d["div_yield_pct"].map(lambda v: _fmt(v, pct=True, digits=2))
+
+    d.columns = [
         "Ticker",
         "Company",
         "Bmk",
@@ -153,7 +188,7 @@ def _kpi_table(group_df: pd.DataFrame) -> None:
         "NPM",
         "D/E",
         "ICR",
-        "FCF",
+        "FCF (Cr)",
         "Rev CAGR",
         "PAT CAGR",
         "Composite",
@@ -161,41 +196,23 @@ def _kpi_table(group_df: pd.DataFrame) -> None:
         "P/B",
         "Div Yield",
     ]
-    display["Bmk"] = display["Bmk"].map(lambda v: "B" if v == 1 else "")
+
+    gold_bg = f"background-color: rgba(201,162,39,0.18); " f"border-left: 3px solid {CHART_GOLD};"
 
     def _highlight_bench(row: pd.Series) -> list[str]:
-        if row["Bmk"] == "B":
-            style = (
-                f"background-color: rgba(201,162,39,0.18); " f"border-left: 3px solid {CHART_GOLD};"
-            )
-        else:
-            style = ""
+        style = gold_bg if row["Bmk"] == "B" else ""
         return [style] * len(row)
 
-    styled = display.style.apply(_highlight_bench, axis=1)
-    st.dataframe(
-        styled,
-        hide_index=True,
-        use_container_width=True,
-        height=420,
-        column_config={
-            "Ticker": text_col("Ticker"),
-            "Company": text_col("Company"),
-            "Bmk": st.column_config.TextColumn("Bmk", width="small"),
-            "ROE": percent_col("ROE"),
-            "ROCE": percent_col("ROCE"),
-            "NPM": percent_col("NPM"),
-            "D/E": number_col("D/E", digits=2),
-            "ICR": number_col("ICR", digits=2),
-            "FCF": number_col("FCF", digits=0),
-            "Rev CAGR": percent_col("Rev CAGR"),
-            "PAT CAGR": percent_col("PAT CAGR"),
-            "Composite": number_col("Composite", digits=1),
-            "P/E": ratio_col("P/E"),
-            "P/B": ratio_col("P/B", digits=1),
-            "Div Yield": percent_col("Div Yield"),
-        },
+    styled = d.style.apply(_highlight_bench, axis=1)
+
+    # Right-align all numeric columns (after Ticker/Company/Bmk)
+    right_cols = list(d.columns[3:])
+    styled = styled.set_properties(
+        subset=right_cols,
+        **{"text-align": "right", "font-variant-numeric": "tabular-nums"},
     )
+
+    st.dataframe(styled, hide_index=True, use_container_width=True, height=420)
     st.caption("Gold-highlighted row denotes peer-group benchmark (B).")
 
 
