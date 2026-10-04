@@ -1,7 +1,7 @@
-"""Screen 02 - Company Profile (Day 23).
+"""Screen 02 - Company Profile.
 
-Autocomplete search, identity card, 6 KPI tiles, 10-year Revenue/PAT bar
-chart, ROE/ROCE dual-axis line chart, and pros/cons badges.
+Autocomplete search, identity card, 6 KPI tiles, 10-year Revenue/PAT chart,
+ROE/ROCE dual-axis line chart, and structured Strengths/Weaknesses panel.
 """
 
 from __future__ import annotations
@@ -16,31 +16,39 @@ from src.dashboard.utils.db import (
     get_prosandcons,
     get_ratios,
 )
+from src.dashboard.utils.theme import (
+    CHART_GOLD,
+    CHART_GREEN,
+    CHART_RED,
+    COLORS,
+    app_stamp,
+    page_header,
+    plotly_chart,
+    section_label,
+)
 
 
 def _search_box(companies: pd.DataFrame) -> str | None:
     """Render the text-search box with autocomplete-style dropdown."""
-    # Build (ticker, name) -> label mapping
     labels = [f"{row['ticker']} - {row['company_name']}" for _, row in companies.iterrows()]
     label_to_ticker = {
         f"{row['ticker']} - {row['company_name']}": row["ticker"] for _, row in companies.iterrows()
     }
 
     typed = st.text_input(
-        "Search company (type ticker or name, then select below)",
+        "Search Company",
         value="",
-        placeholder="e.g. TCS, INFY, Reliance, HDFC Bank",
-        help="Type a ticker or a substring of the company name, then pick from " "the dropdown.",
+        placeholder="Enter ticker or company name, e.g. TCS, INFY, HDFCBANK",
     )
     filtered = labels
     if typed.strip():
         q = typed.strip().upper()
         filtered = [lab for lab in labels if q in lab.upper()]
         if not filtered:
-            filtered = labels  # fall back to full list if no match
+            filtered = labels
 
     selection = st.selectbox(
-        "Matching companies",
+        "Matching Companies",
         options=filtered,
         index=0 if filtered else None,
         key="profile_select",
@@ -51,7 +59,7 @@ def _search_box(companies: pd.DataFrame) -> str | None:
 
 
 def _company_card(info: dict) -> None:
-    """Render identity card with name, sector, sub-sector, NSE ticker, about."""
+    """Identity card: name, sector, sub-sector, NSE ticker, about."""
     name = info.get("company_name", "Unknown")
     ticker = info.get("ticker", "")
     sector = info.get("broad_sector") or "-"
@@ -60,17 +68,26 @@ def _company_card(info: dict) -> None:
     about = info.get("about_company") or "No description available."
     website = info.get("website") or ""
 
-    st.subheader(f"{name}  (`{ticker}`)")
+    st.markdown(
+        f"<div style='margin:0.3rem 0 0.5rem'>"
+        f"<span style='font-size:1.2rem;font-weight:700;letter-spacing:-0.01em'>{name}</span>"
+        f"&nbsp;&nbsp;<span style='font-family:JetBrains Mono,SF Mono,monospace;"
+        f"color:{COLORS['gold']};background:{COLORS['card']};border:1px solid {COLORS['border']};"
+        f"padding:2px 8px;border-radius:3px;font-size:0.78rem'>{ticker}</span>"
+        f"</div>",
+        unsafe_allow_html=True,
+    )
+
     meta1, meta2, meta3 = st.columns(3)
-    meta1.metric("NSE Ticker", ticker)
-    meta2.metric("Sector", sector)
-    meta3.metric("Market-cap category", cap)
-    st.caption(f"Sub-sector: {sub}")
+    meta1.metric("Sector", sector)
+    meta2.metric("Sub-sector", sub)
+    meta3.metric("Market Cap Category", cap)
     if website:
         st.caption(f"Website: {website}")
     st.markdown(
-        f"<div style='padding:10px 14px;border-left:4px solid #1F77B4;"
-        f"background:#F7F9FC;border-radius:4px'>{about}</div>",
+        f"<div style='padding:10px 14px;border-left:3px solid {COLORS['gold']};"
+        f"background:{COLORS['card']};border-radius:0 3px 3px 0;color:{COLORS['text']};"
+        f"font-size:0.88rem;line-height:1.5'>{about}</div>",
         unsafe_allow_html=True,
     )
 
@@ -81,7 +98,7 @@ def _kpi_tiles(latest: pd.Series) -> None:
     def _fmt(v: object, suffix: str = "", digits: int = 1) -> str:
         if v is None or pd.isna(v):
             return "n/a"
-        return f"{float(v):.{digits}f}{suffix}"
+        return f"{float(v):,.{digits}f}{suffix}"
 
     roe = latest.get("return_on_equity_pct")
     roce = latest.get("roce_pct")
@@ -91,77 +108,76 @@ def _kpi_tiles(latest: pd.Series) -> None:
     fcf = latest.get("free_cash_flow_cr")
 
     c1, c2, c3, c4, c5, c6 = st.columns(6)
-    c1.metric("ROE", _fmt(roe, "%"))
-    c2.metric("ROCE", _fmt(roce, "%"))
-    c3.metric("Net Profit Margin", _fmt(npm, "%"))
+    c1.metric("ROE", _fmt(roe, "%", 2))
+    c2.metric("ROCE", _fmt(roce, "%", 2))
+    c3.metric("Net Margin", _fmt(npm, "%", 2))
     c4.metric("D/E", _fmt(de, digits=2))
-    c5.metric("Revenue CAGR 5y", _fmt(rev5, "%"))
-    c6.metric("Free Cash Flow (Cr)", _fmt(fcf, digits=0))
+    c5.metric("Revenue CAGR 5Y", _fmt(rev5, "%", 2))
+    c6.metric("Free Cash Flow", _fmt(fcf, " Cr", 0))
 
 
 def _revenue_pat_chart(pl: pd.DataFrame) -> None:
-    """10-year grouped bar chart for Revenue (sales) and Net Profit.
-
-    Rows with NaN sales/profit are dropped; if fewer than 10 years of
-    history exist an informational note is rendered above the chart.
-    """
-    plot_df = pl.head(10).copy()  # already desc - head = most recent
-    plot_df = plot_df.sort_values("year")
+    """10-year grouped bar chart for Revenue and Net Profit."""
+    plot_df = pl.head(10).copy().sort_values("year")
     plot_df["sales"] = pd.to_numeric(plot_df["sales"], errors="coerce")
     plot_df["net_profit"] = pd.to_numeric(plot_df["net_profit"], errors="coerce")
     plot_df = plot_df.dropna(subset=["sales"])
     if plot_df.empty:
-        st.info("No revenue history available for this company.")
+        st.info("No revenue history available.")
         return
     if len(plot_df) < 10:
-        st.caption(
-            f"Note: only {len(plot_df)} year(s) of revenue history available " "(partial data)."
-        )
-    plot_df["Revenue (Cr)"] = plot_df["sales"].astype(float)
-    plot_df["Net Profit (Cr)"] = plot_df["net_profit"].fillna(0).astype(float)
+        st.caption(f"Partial history available - {len(plot_df)} year(s).")
+    plot_df["Revenue"] = plot_df["sales"].astype(float)
+    plot_df["Net Profit"] = plot_df["net_profit"].fillna(0).astype(float)
 
     fig = go.Figure()
     fig.add_bar(
-        x=plot_df["year"], y=plot_df["Revenue (Cr)"], name="Revenue", marker_color="#1F77B4"
+        x=plot_df["year"],
+        y=plot_df["Revenue"],
+        name="Revenue",
+        marker_color=CHART_GOLD,
+        marker_line_width=0,
     )
     fig.add_bar(
         x=plot_df["year"],
-        y=plot_df["Net Profit (Cr)"],
+        y=plot_df["Net Profit"],
         name="Net Profit",
-        marker_color="#2CA02C",
+        marker_color=CHART_GREEN,
+        marker_line_width=0,
     )
     fig.update_layout(
         barmode="group",
-        title="Revenue & Net Profit (Cr)",
+        title="Revenue and Net Profit (Rs Cr)",
         xaxis_title="Financial Year",
-        yaxis_title="Cr",
+        yaxis_title="Rs Cr",
         height=400,
-        margin=dict(l=10, r=10, t=50, b=10),
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+        bargap=0.25,
+        bargroupgap=0.1,
     )
-    st.plotly_chart(fig, use_container_width=True)
+    plotly_chart(fig, height=400)
 
 
 def _roe_roce_chart(ratios: pd.DataFrame) -> None:
-    """Dual-axis line chart: ROE and ROCE over time. NaN points are skipped."""
+    """Dual-line chart: ROE and ROCE over time."""
     plot_df = ratios.sort_values("year").copy()
     for col in ("return_on_equity_pct", "roce_pct"):
         plot_df[col] = pd.to_numeric(plot_df[col], errors="coerce")
     plot_df = plot_df.dropna(subset=["return_on_equity_pct", "roce_pct"], how="all")
     if plot_df.empty:
-        st.info("No ROE/ROCE history available for this company.")
+        st.info("No ROE/ROCE history available.")
         return
+    fig = go.Figure()
     roe = plot_df["return_on_equity_pct"]
     roce = plot_df["roce_pct"]
-    fig = go.Figure()
     if roe.notna().any():
         fig.add_trace(
             go.Scatter(
                 x=plot_df.loc[roe.notna(), "year"],
                 y=roe.dropna(),
-                name="ROE %",
+                name="ROE",
                 mode="lines+markers",
-                line=dict(color="#1F77B4", width=2.5),
+                line=dict(color=CHART_GOLD, width=2.2),
+                marker=dict(size=5, color=CHART_GOLD),
             )
         )
     if roce.notna().any():
@@ -169,77 +185,87 @@ def _roe_roce_chart(ratios: pd.DataFrame) -> None:
             go.Scatter(
                 x=plot_df.loc[roce.notna(), "year"],
                 y=roce.dropna(),
-                name="ROCE %",
+                name="ROCE",
                 mode="lines+markers",
-                line=dict(color="#FF4B4B", width=2.5, dash="dash"),
+                line=dict(color=COLORS["blue"], width=2.2, dash="dash"),
+                marker=dict(size=5, color=COLORS["blue"]),
             )
         )
     fig.update_layout(
-        title="ROE & ROCE trend (%)",
+        title="ROE and ROCE Trend (%)",
         xaxis_title="Financial Year",
         yaxis_title="Percent",
         height=400,
-        margin=dict(l=10, r=10, t=50, b=10),
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
     )
-    st.plotly_chart(fig, use_container_width=True)
+    plotly_chart(fig, height=400)
 
 
 def _pros_cons(ticker: str) -> None:
-    """Render pros/cons as green-check / red-cross badge lists."""
+    """Render structured strengths/risks panels."""
     pros, cons = get_prosandcons(ticker)
     left, right = st.columns(2)
     with left:
-        st.markdown("#### Strengths")
+        section_label("Strengths")
         if not pros:
-            st.caption("No pros data available for this company.")
+            st.caption("No strength data available.")
         else:
             for p in pros:
-                st.markdown(f":green[✅] {p}")
+                st.markdown(
+                    f"<div style='padding:6px 10px;border-left:2px solid {CHART_GREEN};"
+                    f"background:{COLORS['card']};margin-bottom:4px;font-size:0.85rem'>"
+                    f"{p}</div>",
+                    unsafe_allow_html=True,
+                )
     with right:
-        st.markdown("#### Weaknesses / Risks")
+        section_label("Risks")
         if not cons:
-            st.caption("No cons data available for this company.")
+            st.caption("No risk data available.")
         else:
             for c in cons:
-                st.markdown(f":red[❌] {c}")
+                st.markdown(
+                    f"<div style='padding:6px 10px;border-left:2px solid {CHART_RED};"
+                    f"background:{COLORS['card']};margin-bottom:4px;font-size:0.85rem'>"
+                    f"{c}</div>",
+                    unsafe_allow_html=True,
+                )
 
 
 def render() -> None:
     """Render the Company Profile page."""
-    st.title("Company Profile")
-    st.caption("Per-company fundamentals drill-down")
+    page_header("Company Profile", "Single-name fundamental drill-down")
 
     companies = get_companies()
     ticker = _search_box(companies)
 
     if ticker is None:
-        st.info("Start typing a company name or ticker to begin.")
+        st.info("Enter a ticker or company name to begin.")
         return
 
     info_df = companies[companies["ticker"] == ticker]
     if info_df.empty:
-        st.error("Ticker not found - please try another.")
+        st.error("Ticker not found.")
         return
     info = info_df.iloc[0].to_dict()
 
     _company_card(info)
-    st.divider()
 
     ratios = get_ratios(ticker)
     pl = get_pl(ticker)
     if ratios.empty:
-        st.warning("No financial ratios found for this ticker.")
+        st.warning("No financial ratios found.")
         return
 
     latest = ratios.iloc[0]
-    st.markdown(f"### Latest FY snapshot: `{latest['year']}`")
+    section_label(f"Latest FY Snapshot - {latest['year']}")
     _kpi_tiles(latest)
-    st.divider()
 
     if not pl.empty:
+        section_label("Revenue and Earnings")
         _revenue_pat_chart(pl)
+    section_label("Profitability Trend")
     _roe_roce_chart(ratios)
 
-    st.divider()
+    section_label("Qualitative Assessment")
     _pros_cons(ticker)
+
+    app_stamp()

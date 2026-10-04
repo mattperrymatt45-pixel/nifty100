@@ -1,8 +1,7 @@
-"""Screen 04 - Peer Comparison (Day 24).
+"""Screen 04 - Peer Comparison.
 
-Peer group dropdown, Scatterpolar radar chart for selected company vs
-peer average, and a side-by-side KPI table that highlights the
-benchmark row.
+Peer-group selector, scatterpolar radar chart for the selected company
+vs peer average, and a KPI table with benchmark row highlighted in gold.
 """
 
 from __future__ import annotations
@@ -12,25 +11,36 @@ import plotly.graph_objects as go
 import streamlit as st
 
 from src.dashboard.utils.db import get_peer_groups, get_peers
+from src.dashboard.utils.theme import (
+    CHART_GOLD,
+    COLORS,
+    app_stamp,
+    number_col,
+    page_header,
+    percent_col,
+    plotly_chart,
+    ratio_col,
+    section_label,
+    text_col,
+)
 
 RADAR_AXES = [
     ("roe", "ROE", "roe_pct", False),
     ("roce", "ROCE", "roce_pct", False),
     ("npm", "NPM", "npm_pct", False),
-    ("de", "D/E (inv)", "de", True),  # inverted: lower D/E = better
+    ("de", "D/E (inv)", "de", True),
     ("cfo_pat", "CFO/PAT", "cfo_pat", False),
-    ("pat_cagr_5yr", "PAT CAGR 5y", "pat_cagr_5yr", False),
-    ("rev_cagr_5yr", "Rev CAGR 5y", "rev_cagr_5yr", False),
+    ("pat_cagr", "PAT CAGR", "pat_cagr_5yr", False),
+    ("rev_cagr", "REV CAGR", "rev_cagr_5yr", False),
     ("composite", "Composite", "composite", False),
 ]
 
 
 def _percentile_rank(series: pd.Series, value: float, invert: bool = False) -> float:
-    """SQL-style PERCENT_RANK (rank-1)/(n-1) with min tie handling.
+    """Percentile rank on a 0-1 scale (1 = best in group).
 
-    ``invert=True`` uses ascending rank on the inverted scale so lower raw
-    values map to higher percentiles (used for D/E). NaN values return 0.5
-    (neutral midpoint) so missing data doesn't dominate the radar.
+    ``invert=True`` flips the scale so that lower raw values rank higher
+    (used for D/E, where lower leverage is better). NaN returns 0.5.
     """
     s = pd.to_numeric(series, errors="coerce").dropna()
     if s.empty or pd.isna(value):
@@ -41,12 +51,12 @@ def _percentile_rank(series: pd.Series, value: float, invert: bool = False) -> f
     n = len(s)
     if n == 1:
         return 1.0
-    rank = int((s < value).sum()) + 1  # 1-based rank (method=min)
+    rank = int((s < value).sum()) + 1
     return (rank - 1) / (n - 1)
 
 
-def _build_radar(group_df: pd.DataFrame, ticker: str) -> go.Figure:
-    """Build a Scatterpolar figure comparing ``ticker`` against peer average."""
+def _build_radar(group_df: pd.DataFrame, ticker: str, group_name: str) -> go.Figure:
+    """Scatterpolar comparing ``ticker`` against the peer average."""
     peer_vals: list[float] = []
     company_vals: list[float] = []
     labels: list[str] = []
@@ -56,15 +66,12 @@ def _build_radar(group_df: pd.DataFrame, ticker: str) -> go.Figure:
     for _key, label, col, invert in RADAR_AXES:
         labels.append(label)
         col_series = group_df[col]
-        peer_pct = _percentile_rank(col_series, col_series.mean(skipna=True), invert=invert)
-        peer_vals.append(peer_pct)
+        peer_vals.append(_percentile_rank(col_series, col_series.mean(skipna=True), invert=invert))
         if crow is not None:
-            company_pct = _percentile_rank(col_series, crow[col], invert=invert)
+            company_vals.append(_percentile_rank(col_series, crow[col], invert=invert))
         else:
-            company_pct = 0.5
-        company_vals.append(company_pct)
+            company_vals.append(0.5)
 
-    # Close the polygon
     labels_c = [*labels, labels[0]]
     peer_vals_c = [*peer_vals, peer_vals[0]]
     company_vals_c = [*company_vals, company_vals[0]]
@@ -75,9 +82,9 @@ def _build_radar(group_df: pd.DataFrame, ticker: str) -> go.Figure:
             r=company_vals_c,
             theta=labels_c,
             fill="toself",
-            name=f"{ticker}",
-            line=dict(color="#1F77B4", width=2.5),
-            fillcolor="rgba(31,119,180,0.22)",
+            name=ticker,
+            line=dict(color=CHART_GOLD, width=2.4),
+            fillcolor="rgba(201,162,39,0.18)",
         )
     )
     fig.add_trace(
@@ -86,30 +93,38 @@ def _build_radar(group_df: pd.DataFrame, ticker: str) -> go.Figure:
             theta=labels_c,
             fill=None,
             name="Peer Average",
-            line=dict(color="#FF4B4B", width=2, dash="dash"),
+            line=dict(color=COLORS["text_mute"], width=1.8, dash="dash"),
         )
     )
     fig.update_layout(
         polar=dict(
+            bgcolor="rgba(0,0,0,0)",
             radialaxis=dict(
                 visible=True,
                 range=[0, 1],
-                tickvals=[0.25, 0.5, 0.75, 1.0],
-                ticktext=["25%", "50%", "75%", "100%"],
+                tickvals=[0.25, 0.50, 0.75, 1.00],
+                ticktext=["25", "50", "75", "100"],
+                gridcolor=COLORS["border"],
+                linecolor=COLORS["border"],
+                tickfont=dict(size=10, color=COLORS["text_mute"]),
             ),
-            angularaxis=dict(tickfont=dict(size=11)),
+            angularaxis=dict(
+                tickfont=dict(size=11, color=COLORS["text"]),
+                gridcolor=COLORS["border"],
+                linecolor=COLORS["border"],
+            ),
         ),
         showlegend=True,
-        legend=dict(orientation="h", yanchor="bottom", y=-0.12, xanchor="center", x=0.5),
-        margin=dict(l=40, r=40, t=40, b=40),
+        legend=dict(orientation="h", yanchor="bottom", y=-0.08, xanchor="center", x=0.5),
+        margin=dict(l=40, r=40, t=30, b=40),
         height=520,
-        title=f"{ticker} vs {group_df.attrs.get('group_name', '')} peer avg (percentile scale)",
+        title=dict(text=f"{ticker} vs {group_name} Peer Average (percentile)", x=0),
     )
     return fig
 
 
 def _kpi_table(group_df: pd.DataFrame) -> None:
-    """Render KPI table with benchmark row highlighted."""
+    """KPI table with benchmark row highlighted in gold."""
     display = group_df[
         [
             "ticker",
@@ -132,40 +147,29 @@ def _kpi_table(group_df: pd.DataFrame) -> None:
     display.columns = [
         "Ticker",
         "Company",
-        "Bench",
-        "ROE %",
-        "ROCE %",
-        "NPM %",
+        "Bmk",
+        "ROE",
+        "ROCE",
+        "NPM",
         "D/E",
         "ICR",
-        "FCF (Cr)",
-        "Rev CAGR 5y",
-        "PAT CAGR 5y",
+        "FCF",
+        "Rev CAGR",
+        "PAT CAGR",
         "Composite",
         "P/E",
         "P/B",
-        "Div Yield %",
+        "Div Yield",
     ]
-    for c in [
-        "ROE %",
-        "ROCE %",
-        "NPM %",
-        "D/E",
-        "ICR",
-        "FCF (Cr)",
-        "Rev CAGR 5y",
-        "PAT CAGR 5y",
-        "Composite",
-        "P/E",
-        "P/B",
-        "Div Yield %",
-    ]:
-        display[c] = display[c].map(lambda v: round(float(v), 1) if pd.notna(v) else "")
-    display["Bench"] = display["Bench"].map(lambda v: "★" if v == 1 else "")
+    display["Bmk"] = display["Bmk"].map(lambda v: "B" if v == 1 else "")
 
     def _highlight_bench(row: pd.Series) -> list[str]:
-        is_bench = row["Bench"] == "★"
-        style = "background-color: #FFD966; font-weight: bold;" if is_bench else ""
+        if row["Bmk"] == "B":
+            style = (
+                f"background-color: rgba(201,162,39,0.18); " f"border-left: 3px solid {CHART_GOLD};"
+            )
+        else:
+            style = ""
         return [style] * len(row)
 
     styled = display.style.apply(_highlight_bench, axis=1)
@@ -174,17 +178,34 @@ def _kpi_table(group_df: pd.DataFrame) -> None:
         hide_index=True,
         use_container_width=True,
         height=420,
+        column_config={
+            "Ticker": text_col("Ticker"),
+            "Company": text_col("Company"),
+            "Bmk": st.column_config.TextColumn("Bmk", width="small"),
+            "ROE": percent_col("ROE"),
+            "ROCE": percent_col("ROCE"),
+            "NPM": percent_col("NPM"),
+            "D/E": number_col("D/E", digits=2),
+            "ICR": number_col("ICR", digits=2),
+            "FCF": number_col("FCF", digits=0),
+            "Rev CAGR": percent_col("Rev CAGR"),
+            "PAT CAGR": percent_col("PAT CAGR"),
+            "Composite": number_col("Composite", digits=1),
+            "P/E": ratio_col("P/E"),
+            "P/B": ratio_col("P/B", digits=1),
+            "Div Yield": percent_col("Div Yield"),
+        },
     )
+    st.caption("Gold-highlighted row denotes peer-group benchmark (B).")
 
 
 def render() -> None:
     """Render the Peer Comparison page."""
-    st.title("Peer Comparison")
-    st.caption("Radar chart + percentile heatmap by peer group")
+    page_header("Peer Comparison", "Radar analytics and KPI benchmarking by peer group.")
 
     groups = get_peer_groups()
     group_name = st.selectbox(
-        "Peer group",
+        "Peer Group",
         options=groups["peer_group_name"].tolist(),
         index=(
             groups["peer_group_name"].tolist().index("IT Services")
@@ -196,8 +217,8 @@ def render() -> None:
     group_df = get_peers(group_name)
     if group_df.empty:
         st.warning(f"No members found for peer group '{group_name}'.")
+        app_stamp()
         return
-    group_df.attrs["group_name"] = group_name
 
     tickers = group_df["ticker"].tolist()
     benchmark_row = group_df[group_df["is_benchmark"] == 1]
@@ -205,12 +226,13 @@ def render() -> None:
 
     col_left, col_right = st.columns([1, 1])
     with col_left:
-        ticker = st.selectbox("Select company", tickers, index=tickers.index(default_ticker))
+        ticker = st.selectbox("Company", tickers, index=tickers.index(default_ticker))
     with col_right:
-        st.metric("Group members", len(group_df))
+        st.metric("Group Members", f"{len(group_df)}")
 
-    st.plotly_chart(_build_radar(group_df, ticker), use_container_width=True)
+    plotly_chart(_build_radar(group_df, ticker, group_name), height=520)
 
-    st.subheader(f"{group_name} - KPI table")
-    st.caption("★ = peer-group benchmark. Gold-highlighted row = benchmark.")
+    section_label(f"{group_name} - KPI Table")
     _kpi_table(group_df)
+
+    app_stamp()

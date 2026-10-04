@@ -1,7 +1,7 @@
 """Nifty 100 Financial Intelligence Platform - Streamlit Dashboard.
 
-Sprint 4 (Days 22-28): 8-screen interactive analytics dashboard on top
-of the production SQLite warehouse.
+Sprint 4 (Days 22-28): 8-screen institutional-grade analytics dashboard
+on top of the production SQLite warehouse.
 
 Run with::
 
@@ -25,15 +25,22 @@ import streamlit as st  # noqa: E402
 # Page config must be the first Streamlit command executed.
 # ---------------------------------------------------------------------------
 st.set_page_config(
-    page_title="Nifty 100 Analytics",
-    page_icon="📈",
+    page_title="Nifty 100 Terminal",
+    page_icon=None,
     layout="wide",
     initial_sidebar_state="expanded",
 )
 
 # ---------------------------------------------------------------------------
-# Sidebar navigation - manual routing (keeps imports explicit and lets each
-# page module register its own ``render()``).
+# Theme applied before any rendering so CSS applies to all elements below.
+# ---------------------------------------------------------------------------
+from src.dashboard.utils.theme import apply_theme  # noqa: E402
+
+apply_theme()
+
+# ---------------------------------------------------------------------------
+# Sidebar navigation - explicit imports keep the page registry decoupled
+# from the numeric-prefixed module names in ``pages/``.
 # ---------------------------------------------------------------------------
 from src.dashboard.pages import (  # noqa: E402
     capital,
@@ -50,36 +57,39 @@ from src.utils.logger import get_logger  # noqa: E402
 logger = get_logger(__name__)
 
 PAGES: dict[str, tuple[str, object]] = {
-    "🏠 Home": ("Overview & market status", home),
-    "🏢 Company Profile": ("Per-company fundamentals drill-down", profile),
-    "🔍 Screener": ("Preset + custom stock screening", screener),
-    "👥 Peer Comparison": ("Peer-group percentiles & heatmaps", peers),
-    "📈 Trends": ("Multi-year KPI trends", trends),
-    "🏭 Sectors": ("Sector-level analytics", sectors),
-    "💰 Capital Allocation": ("Cash-flow pattern classification", capital),
-    "📄 Reports": ("Excel/PNG report downloads", reports),
+    "Overview": ("Market dashboard and constituent KPIs", home),
+    "Company Profile": ("Single-name fundamental drill-down", profile),
+    "Screener": ("Preset and custom stock screening", screener),
+    "Peer Comparison": ("Peer-group percentiles and radar analytics", peers),
+    "Trends": ("Multi-year KPI trends", trends),
+    "Sectors": ("Sector-level analytics", sectors),
+    "Capital Allocation": ("Cash-flow pattern classification", capital),
+    "Reports": ("Annual reports and downloadable artifacts", reports),
 }
 
 
 def _render_sidebar() -> str:
     """Render the navigation sidebar and return the selected page key."""
     with st.sidebar:
-        st.title("📈 Nifty 100")
-        st.caption("Financial Intelligence Platform")
-        st.divider()
+        st.markdown(
+            "<div class='sidebar-brand'>"
+            "<div class='brand-name'>NIFTY 100</div>"
+            "<div class='brand-sub'>Financial Terminal</div>"
+            "</div>",
+            unsafe_allow_html=True,
+        )
 
-        st.subheader("Navigation")
+        st.markdown(
+            "<div class='section-label' style='margin-top:0.6rem'>Navigation</div>",
+            unsafe_allow_html=True,
+        )
         selection = st.radio(
-            "Go to screen",
+            "Navigation",
             options=list(PAGES.keys()),
             index=0,
             label_visibility="collapsed",
         )
         st.caption(PAGES[selection][0])
-
-        st.divider()
-        st.caption("Sprint 4 · Streamlit Dashboard")
-        st.caption("Data source: `db/nifty100.db`")
 
     return selection
 

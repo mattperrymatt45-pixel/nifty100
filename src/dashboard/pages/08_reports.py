@@ -1,12 +1,12 @@
-"""Screen 08 - Annual Reports / Downloadable Reports (Day 25).
+"""Screen 08 - Reports and Documents.
 
-Search a company, list available annual-report years with clickable
-BSE PDF links. A lightweight URL check marks 404s with a red "Report
-unavailable" badge.
+Annual-report URL check, plus download buttons for project-generated
+Excel artifacts.
 """
 
 from __future__ import annotations
 
+from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
@@ -14,17 +14,19 @@ import pandas as pd
 import streamlit as st
 
 from src.dashboard.utils.db import get_companies, get_documents
+from src.dashboard.utils.theme import (
+    CHART_GREEN,
+    CHART_RED,
+    COLORS,
+    app_stamp,
+    page_header,
+    section_label,
+)
 
 
 @st.cache_data(ttl=1800)
 def _check_url(url: str, timeout: int = 2) -> tuple[bool, str]:
-    """Return (reachable, status-text) for the given URL.
-
-    Checks for known bad substrings first (``missing`` paths, empty values),
-    then attempts a lightweight HEAD request with a 2-second timeout so the
-    page always renders quickly. Network failures or non-2xx/3xx responses
-    return False so the UI can show the red unavailable badge.
-    """
+    """Return (reachable, status-text) for the given URL with a 2s timeout."""
     if not url or not isinstance(url, str) or not url.startswith("http"):
         return False, "invalid URL"
     if "/missing/" in url or url.endswith("missing"):
@@ -37,7 +39,7 @@ def _check_url(url: str, timeout: int = 2) -> tuple[bool, str]:
     except HTTPError as exc:
         return False, f"HTTP {exc.code}"
     except (URLError, TimeoutError, OSError, ValueError):
-        return False, "unreachable (or slow)"
+        return False, "unreachable"
 
 
 def _select_ticker(companies: pd.DataFrame) -> str:
@@ -51,7 +53,7 @@ def _select_ticker(companies: pd.DataFrame) -> str:
 
 
 def _render_report_rows(docs: pd.DataFrame) -> None:
-    """Render a two-column table of [year | link/badge] for each row."""
+    """Render a table of [year | link | status] for each document row."""
     for _i, row in docs.iterrows():
         year = int(row["year"])
         url = row["url"]
@@ -61,70 +63,71 @@ def _render_report_rows(docs: pd.DataFrame) -> None:
             reachable, status = _check_url(str(url))
             if reachable:
                 c2.markdown(
-                    f"<a href='{url}' target='_blank'>📄 Open {year} Annual Report PDF</a>",
+                    f"<a href='{url}' target='_blank' style='color:{COLORS['blue']}'>"
+                    f"Open {year} Annual Report (PDF)</a>",
                     unsafe_allow_html=True,
                 )
-                c3.caption(f"Available ({status})")
+                c3.markdown(
+                    f"<span style='color:{CHART_GREEN};font-size:0.8rem'>"
+                    f"Available ({status})</span>",
+                    unsafe_allow_html=True,
+                )
             else:
                 c2.markdown(
-                    "<span style='color:#721c24'>❌ Report unavailable</span>",
+                    f"<span style='color:{COLORS['text_mute']}'>Report unavailable</span>",
                     unsafe_allow_html=True,
                 )
-                c3.caption(f"{status}")
+                c3.markdown(
+                    f"<span style='color:{CHART_RED};font-size:0.8rem'>{status}</span>",
+                    unsafe_allow_html=True,
+                )
         else:
             c2.markdown(
-                "<span style='color:#721c24'>❌ Report unavailable</span>",
+                f"<span style='color:{COLORS['text_mute']}'>Report unavailable</span>",
                 unsafe_allow_html=True,
             )
             c3.caption("No source URL")
 
 
 def _project_reports_section() -> None:
-    """Static links to the project-generated Excel/PNG artifacts."""
-    st.divider()
-    st.subheader("Project-generated reports")
-    from pathlib import Path
-
+    """Static download buttons for project-generated Excel artifacts."""
+    section_label("Project Artifacts")
     root = Path(__file__).resolve().parents[3]
     artifacts = [
-        ("Screener output", root / "output" / "screener_output.xlsx", "xlsx"),
-        ("Peer comparison workbook", root / "output" / "peer_comparison.xlsx", "xlsx"),
+        ("Screener Output", root / "output" / "screener_output.xlsx", "xlsx"),
+        ("Peer Comparison", root / "output" / "peer_comparison.xlsx", "xlsx"),
+        ("Valuation Summary", root / "output" / "valuation_summary.xlsx", "xlsx"),
+        ("Capital Allocation", root / "output" / "capital_allocation_report.xlsx", "xlsx"),
+        ("Cashflow Intelligence", root / "output" / "cashflow_intelligence.xlsx", "xlsx"),
     ]
     for label, path, kind in artifacts:
         if path.exists():
             with open(path, "rb") as fh:
                 st.download_button(
-                    label=f"⬇️  Download {label} (.{kind})",
+                    label=f"Download {label} (.{kind})",
                     data=fh.read(),
                     file_name=path.name,
                     mime=("application/vnd.openxmlformats-officedocument." "spreadsheetml.sheet"),
                     use_container_width=True,
                 )
         else:
-            st.caption(f"{label}: file not found ({path})")
+            st.caption(f"{label}: file not present ({path.name})")
 
 
 def render() -> None:
-    """Render the "Reports" dashboard page.
-
-    Shows download buttons for tearsheet / batch / portfolio PDFs.
-    """
-    st.title("Reports & Documents")
-    st.caption("Annual report PDFs from BSE, plus project-generated Excel reports.")
+    """Render the Reports page."""
+    page_header("Reports and Documents", "Annual report archive and generated artifacts.")
 
     companies = get_companies()
     ticker = _select_ticker(companies)
 
     docs = get_documents(ticker)
     if docs.empty:
-        st.warning(f"No annual-report records found for {ticker}.")
+        st.warning(f"No annual-report records for {ticker}.")
     else:
-        st.subheader(f"Annual Reports - {ticker}")
-        st.caption(
-            "Links point to the BSE India annual-report archive. A red "
-            "'unavailable' badge means the URL returned HTTP 404 or is "
-            "flagged as a missing link in the source data."
-        )
+        section_label(f"Annual Reports - {ticker}")
+        st.caption("Links point to the BSE India annual-report archive.")
         _render_report_rows(docs)
 
     _project_reports_section()
+    app_stamp()

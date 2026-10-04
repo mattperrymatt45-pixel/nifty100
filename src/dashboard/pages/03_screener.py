@@ -1,4 +1,4 @@
-"""Screen 03 - Screener (Day 24).
+"""Screen 03 - Stock Screener.
 
 10 metric sliders, 6 preset buttons, live-updating results table and
 CSV download button.
@@ -6,15 +6,25 @@ CSV download button.
 
 from __future__ import annotations
 
-import numpy as np
 import pandas as pd
 import streamlit as st
 
 from src.dashboard.utils.db import get_screener_dataset
+from src.dashboard.utils.theme import (
+    COLORS,
+    app_stamp,
+    fmt_cr,
+    number_col,
+    page_header,
+    percent_col,
+    ratio_col,
+    section_label,
+    style_dataframe,
+    text_col,
+)
 
 # ---------------------------------------------------------------------------
-# Preset thresholds (mirrors config/screener_config.yaml for dashboard use;
-# kept local so the dashboard doesn't depend on the YAML loader at runtime).
+# Preset thresholds.
 # ---------------------------------------------------------------------------
 PRESETS: dict[str, dict[str, float]] = {
     "Quality": dict(
@@ -93,6 +103,8 @@ PRESETS: dict[str, dict[str, float]] = {
 
 DEFAULT_FILTERS: dict[str, float] = PRESETS["Quality"]
 
+PRESET_ORDER = ["Quality", "Value", "Growth", "Dividend", "Debt-Free", "Turnaround"]
+
 
 def _init_state() -> None:
     """Seed session state with default slider values once per run."""
@@ -102,9 +114,9 @@ def _init_state() -> None:
 
 def _preset_buttons() -> None:
     """Render the 6 preset buttons; clicking one resets slider state."""
-    st.subheader("Presets")
+    section_label("Strategy Presets")
     cols = st.columns(3)
-    for i, name in enumerate(["Quality", "Value", "Growth", "Dividend", "Debt-Free", "Turnaround"]):
+    for i, name in enumerate(PRESET_ORDER):
         with cols[i % 3]:
             if st.button(name, use_container_width=True, key=f"preset_{name}"):
                 for k, v in PRESETS[name].items():
@@ -113,10 +125,10 @@ def _preset_buttons() -> None:
 
 
 def _sliders() -> dict[str, float]:
-    """Render the 10 metric sliders in the sidebar, return current values."""
+    """Render the 10 metric sliders in the sidebar."""
     with st.sidebar:
         st.divider()
-        st.subheader("Screener Filters")
+        st.markdown("<div class='section-label'>Screener Filters</div>", unsafe_allow_html=True)
 
         roe_min = st.slider(
             "ROE min (%)", 0.0, 40.0, st.session_state.get("roe_min", 15.0), 0.5, key="roe_min"
@@ -125,7 +137,7 @@ def _sliders() -> dict[str, float]:
             "D/E max", 0.0, 5.0, st.session_state.get("de_max", 1.0), 0.05, key="de_max"
         )
         fcf_min = st.slider(
-            "FCF min (Cr)",
+            "FCF min (Rs Cr)",
             -20000.0,
             50000.0,
             st.session_state.get("fcf_min", 0.0),
@@ -133,7 +145,7 @@ def _sliders() -> dict[str, float]:
             key="fcf_min",
         )
         rev_cagr_min = st.slider(
-            "Revenue CAGR 5y min (%)",
+            "Revenue CAGR 5Y min (%)",
             -10.0,
             40.0,
             st.session_state.get("rev_cagr_min", 10.0),
@@ -141,7 +153,7 @@ def _sliders() -> dict[str, float]:
             key="rev_cagr_min",
         )
         pat_cagr_min = st.slider(
-            "PAT CAGR 5y min (%)",
+            "PAT CAGR 5Y min (%)",
             -20.0,
             50.0,
             st.session_state.get("pat_cagr_min", 0.0),
@@ -184,7 +196,7 @@ def _sliders() -> dict[str, float]:
 
 
 def _apply_filters(df: pd.DataFrame, f: dict[str, float]) -> pd.DataFrame:
-    """Apply the slider filters to the screener dataset."""
+    """Apply slider filters and sort by composite descending."""
     mask = (
         (df["roe_pct"].fillna(-1e9) >= f["roe_min"])
         & (df["de"].fillna(1e9) <= f["de_max"])
@@ -201,15 +213,14 @@ def _apply_filters(df: pd.DataFrame, f: dict[str, float]) -> pd.DataFrame:
     return out.sort_values("composite", ascending=False, na_position="last")
 
 
-def _csv(df: pd.DataFrame) -> str:
-    """Convert result DataFrame to well-formed CSV (UTF-8, no index)."""
+def _csv(df: pd.DataFrame) -> bytes:
+    """Convert result DataFrame to UTF-8 CSV bytes."""
     return df.to_csv(index=False).encode("utf-8")
 
 
 def render() -> None:
     """Render the Screener page."""
-    st.title("Stock Screener")
-    st.caption("Adjust sliders in the sidebar, or click a preset to auto-fill filters.")
+    page_header("Stock Screener", "Multi-factor screening across Nifty 100 constituents.")
 
     _init_state()
     filters = _sliders()
@@ -218,10 +229,15 @@ def render() -> None:
     df = get_screener_dataset()
     results = _apply_filters(df, filters)
 
-    st.subheader(f"{len(results)} companies match your filters")
+    st.markdown(
+        f"<div style='margin:0.5rem 0 1rem;color:{COLORS['text_mute']};font-size:0.85rem'>"
+        f"<b style='color:{COLORS['text']}'>{len(results)}</b> constituents match filters</div>",
+        unsafe_allow_html=True,
+    )
 
     if results.empty:
-        st.warning("No companies match - widen the filters or try a preset.")
+        st.warning("No constituents match - widen the filters or select a preset.")
+        app_stamp()
         return
 
     show = results[
@@ -247,38 +263,53 @@ def render() -> None:
         "Company",
         "Sector",
         "Composite",
-        "ROE %",
+        "ROE",
         "D/E",
-        "FCF (Cr)",
-        "Rev CAGR 5y %",
-        "PAT CAGR 5y %",
-        "OPM %",
+        "FCF",
+        "Rev CAGR 5Y",
+        "PAT CAGR 5Y",
+        "OPM",
         "P/E",
         "P/B",
-        "Div Yield %",
+        "Div Yield",
         "ICR",
     ]
-    for col in [
-        "Composite",
-        "ROE %",
-        "D/E",
-        "FCF (Cr)",
-        "Rev CAGR 5y %",
-        "PAT CAGR 5y %",
-        "OPM %",
-        "P/E",
-        "P/B",
-        "Div Yield %",
-        "ICR",
-    ]:
-        show[col] = show[col].map(lambda v: round(float(v), 1) if pd.notna(v) else np.nan)
+    # Pre-format currency column
+    show["FCF"] = show["FCF"].map(lambda v: fmt_cr(v, plain=False))
 
-    st.dataframe(show, hide_index=True, use_container_width=True, height=520)
+    st.dataframe(
+        style_dataframe(
+            show,
+            green_cols={"ROE", "Rev CAGR 5Y", "PAT CAGR 5Y", "OPM", "Composite", "Div Yield"},
+            red_cols={"D/E"},
+        ),
+        hide_index=True,
+        use_container_width=True,
+        height=540,
+        column_config={
+            "Ticker": text_col("Ticker"),
+            "Company": text_col("Company"),
+            "Sector": text_col("Sector"),
+            "Composite": number_col("Composite", digits=1),
+            "ROE": percent_col("ROE"),
+            "D/E": number_col("D/E", digits=2),
+            "FCF": text_col("FCF"),
+            "Rev CAGR 5Y": percent_col("Rev CAGR 5Y"),
+            "PAT CAGR 5Y": percent_col("PAT CAGR 5Y"),
+            "OPM": percent_col("OPM"),
+            "P/E": ratio_col("P/E"),
+            "P/B": ratio_col("P/B", digits=1),
+            "Div Yield": percent_col("Div Yield"),
+            "ICR": number_col("ICR", digits=2),
+        },
+    )
 
     st.download_button(
-        label="Download results as CSV",
+        label="Export Results (CSV)",
         data=_csv(show),
         file_name="screener_results.csv",
         mime="text/csv",
         use_container_width=True,
     )
+
+    app_stamp()

@@ -1,0 +1,21 @@
+# =============================================================================
+# Nifty 100 Financial Intelligence Platform - Streamlit Global Theme
+# Institutional dark-terminal palette (Bloomberg / FactSet / Capital IQ style).
+# =============================================================================
+
+[server]
+headless = true
+address = "0.0.0.0"
+enableCORS = false
+enableXsrfProtection = false
+
+[browser]
+gatherUsageStats = false
+
+[theme]
+base = "dark"
+primaryColor = "#C9A227"      # muted institutional gold
+backgroundColor = "#0B0F17"  # deep navy canvas
+secondaryBackgroundColor = "#131822"  # panel surface
+textColor = "#E8ECEF"        # off-white primary text
+font = "sans serif"

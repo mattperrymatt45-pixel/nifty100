@@ -1,7 +1,7 @@
-"""Screen 07 - Capital Allocation Map (Day 25).
+"""Screen 07 - Capital Allocation Map.
 
-Plotly treemap of all 92 companies grouped by capital-allocation
-pattern. Clicking a pattern shows the list of companies underneath.
+Treemap of all constituents grouped by capital-allocation pattern,
+pattern summary tiles, and drill-down constituent list.
 """
 
 from __future__ import annotations
@@ -11,37 +11,43 @@ import plotly.express as px
 import streamlit as st
 
 from src.dashboard.utils.db import get_full_ratios_with_pl
+from src.dashboard.utils.theme import (
+    CHART_PALETTE,
+    COLORS,
+    app_stamp,
+    number_col,
+    page_header,
+    plotly_chart,
+    section_label,
+    text_col,
+)
 
+# Institutional palette for the 8 patterns (muted, high-contrast).
 PATTERN_COLORS = {
-    "Reinvestor": "#2CA02C",
-    "Shareholder Returns": "#1F77B4",
-    "Cash Accumulator": "#9467BD",
-    "Liquidating Assets": "#FF7F0E",
-    "Distress Signal": "#D62728",
-    "Growth Funded by Debt": "#E377C2",
-    "Pre-Revenue": "#7F7F7F",
-    "Mixed": "#BCBD22",
+    "Reinvestor": "#2EB886",  # forest
+    "Shareholder Returns": "#4C8BF5",  # slate blue
+    "Cash Accumulator": "#B07AE0",  # muted violet
+    "Liquidating Assets": "#E0A43C",  # amber
+    "Distress Signal": "#D94F5C",  # brick red
+    "Growth Funded by Debt": "#D17B55",  # terracotta
+    "Pre-Revenue": "#5E6878",  # slate
+    "Mixed": "#8A94A6",  # muted grey
 }
 
 
 def render() -> None:
-    """Render the "Capital Allocation" dashboard page.
-
-    Shows an 8-pattern donut and per-pattern company breakdown.
-    """
-    st.title("Capital Allocation Map")
-    st.caption(
-        "Companies grouped by CFO/CFI/CFF cash-flow pattern. Click a "
-        "pattern tile in the treemap to expand constituent companies."
+    """Render the Capital Allocation page."""
+    page_header(
+        "Capital Allocation Map",
+        "Constituents grouped by CFO/CFI/CFF cash-flow pattern, sized by market cap.",
     )
 
     panel = get_full_ratios_with_pl()
     latest_year = panel["year"].max()
     df = panel[panel["year"] == latest_year].copy()
     df["pattern"] = df["capital_allocation_pattern"].fillna("Mixed")
-    df["ticker"] = df["company_id"]
 
-    # Build treemap data: level 0 = pattern, level 1 = company
+    # Build treemap hierarchy: root -> pattern -> company
     treemap_df = df[
         [
             "pattern",
@@ -53,42 +59,41 @@ def render() -> None:
             "market_cap_crore",
         ]
     ].copy()
-    # Parent column: company rows point to their pattern
     treemap_df["parent"] = treemap_df["pattern"]
-    # Pattern rows point to the synthetic root
+
     pattern_summary = df.groupby("pattern").agg(count=("company_id", "count")).reset_index()
-    pattern_summary["parent"] = "All Companies"
+    pattern_summary["parent"] = "Nifty 100"
     pattern_summary["company_id"] = pattern_summary["pattern"]
-    pattern_summary["company_name"] = pattern_summary["pattern"] + (
-        " (" + pattern_summary["count"].astype(str) + " companies)"
+    pattern_summary["company_name"] = (
+        pattern_summary["pattern"] + " (" + pattern_summary["count"].astype(str) + ")"
     )
     pattern_summary["fcf_cr"] = 0
     pattern_summary["cfo_pat_ratio"] = 0
     pattern_summary["composite_quality_score"] = 0
-    pattern_summary["market_cap_crore"] = pattern_summary["count"] * 10000
-    # Root node
+    pattern_summary["market_cap_crore"] = pattern_summary["count"] * 10_000
+
     root = pd.DataFrame(
         [
             {
-                "pattern": "All Companies",
-                "company_id": "All Companies",
-                "company_name": f"All Companies ({len(df)} firms)",
+                "pattern": "Nifty 100",
+                "company_id": "Nifty 100",
+                "company_name": f"Nifty 100 ({len(df)} firms)",
                 "parent": "",
                 "fcf_cr": 0,
                 "cfo_pat_ratio": 0,
                 "composite_quality_score": 0,
-                "market_cap_crore": len(df) * 20000,
+                "market_cap_crore": len(df) * 20_000,
             }
         ]
     )
     treemap_df = pd.concat(
-        [root, pattern_summary.assign(pattern="All Companies"), treemap_df],
+        [root, pattern_summary.assign(pattern="Nifty 100"), treemap_df],
         ignore_index=True,
         sort=False,
     )
 
-    color_map = {p: PATTERN_COLORS.get(p, "#7F7F7F") for p in df["pattern"].unique()}
-    color_map["All Companies"] = "#1F4E78"
+    color_map = {p: PATTERN_COLORS.get(p, COLORS["text_mute"]) for p in df["pattern"].unique()}
+    color_map["Nifty 100"] = CHART_PALETTE[0]
 
     fig = px.treemap(
         treemap_df,
@@ -104,33 +109,42 @@ def render() -> None:
             "composite_quality_score": ":.1f",
             "market_cap_crore": ":,.0f",
         },
-        title=f"Capital allocation map (FY {latest_year}) - sized by market cap",
+        title=f"Capital Allocation - FY {latest_year}",
     )
-    fig.update_layout(margin=dict(t=40, l=10, r=10, b=10), height=560)
-    st.plotly_chart(fig, use_container_width=True)
+    fig.update_traces(
+        textfont=dict(family="Inter, sans-serif", size=11, color=COLORS["text"]),
+        marker=dict(cornerradius=2),
+    )
+    fig.update_layout(margin=dict(t=40, l=0, r=0, b=10), height=580)
+    plotly_chart(fig, height=580)
 
-    # Pattern legend / counts
-    st.subheader("Pattern breakdown")
+    # Pattern summary tiles
+    section_label("Pattern Breakdown")
     counts = (
         df.groupby("pattern").size().reset_index(name="count").sort_values("count", ascending=False)
     )
     cols = st.columns(min(4, len(counts)))
     for i, row in counts.reset_index(drop=True).iterrows():
         with cols[i % 4]:
-            color = PATTERN_COLORS.get(row["pattern"], "#7F7F7F")
+            color = PATTERN_COLORS.get(row["pattern"], COLORS["text_mute"])
             st.markdown(
-                f"<div style='padding:8px;border-left:5px solid {color};"
-                f"background:#F7F9FC'><b>{row['pattern']}</b><br>"
-                f"{int(row['count'])} companies</div>",
+                f"<div style='padding:10px 12px;border-left:3px solid {color};"
+                f"background:{COLORS['card']};border-radius:0 3px 3px 0;margin-bottom:4px'>"
+                f"<div style='font-size:0.7rem;font-weight:700;letter-spacing:0.1em;"
+                f"text-transform:uppercase;color:{COLORS['text_mute']}'>"
+                f"{row['pattern']}</div>"
+                f"<div style='font-size:1.3rem;font-weight:700;margin-top:0.15rem'>"
+                f"{int(row['count'])}</div></div>",
                 unsafe_allow_html=True,
             )
 
-    # Click-to-drilldown: simple pattern selector reveals members
+    # Drill-down
+    section_label("Pattern Drill-Down")
     pattern_choice = st.selectbox(
-        "Show companies in pattern",
-        ["(select a pattern)", *sorted(df["pattern"].unique().tolist())],
+        "Select Pattern",
+        ["(select)", *sorted(df["pattern"].unique().tolist())],
     )
-    if pattern_choice != "(select a pattern)":
+    if pattern_choice != "(select)":
         members = df[df["pattern"] == pattern_choice][
             [
                 "company_id",
@@ -142,4 +156,18 @@ def render() -> None:
             ]
         ].sort_values("composite_quality_score", ascending=False, na_position="last")
         members.columns = ["Ticker", "Company", "Sector", "FCF (Cr)", "CFO/PAT", "Composite"]
-        st.dataframe(members, hide_index=True, use_container_width=True)
+        st.dataframe(
+            members,
+            hide_index=True,
+            use_container_width=True,
+            column_config={
+                "Ticker": text_col("Ticker"),
+                "Company": text_col("Company"),
+                "Sector": text_col("Sector"),
+                "FCF (Cr)": number_col("FCF (Cr)", digits=0),
+                "CFO/PAT": number_col("CFO/PAT", digits=2),
+                "Composite": number_col("Composite", digits=1),
+            },
+        )
+
+    app_stamp()
