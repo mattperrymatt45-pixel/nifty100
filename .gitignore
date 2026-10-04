@@ -26,27 +26,31 @@ ENV/
 env.bak/
 venv.bak/
 
-# --- Database Files ---
+# --- Database Files (built by build.sh on deploy; do not commit binaries) ---
 *.db
 *.sqlite
 *.sqlite3
 db/*.db
 db/*.sqlite
 
-# --- Data Files (raw, interim, processed) ---
+# --- Data Files (raw Excel inputs are committed so Render/CI can rebuild the
+#     DB from scratch; interim/processed/generated outputs are ignored) ---
 *.csv
-*.xlsx
-*.xls
 *.parquet
 *.feather
 *.pkl
 *.pickle
-data/raw/*
 data/processed/*
 data/interim/*
 !data/raw/.gitkeep
 !data/processed/.gitkeep
 !data/interim/.gitkeep
+output/*.xlsx
+output/*.csv
+output/*.json
+output/*.md
+!data/raw/*.xlsx
+!data/raw/supporting datasets/*.xlsx
 
 # --- Generated Output ---
 # Ignore contents of logs/, output/, reports/generated but keep the
