@@ -106,3 +106,9 @@ reports/sector/
 !reports/sector/.gitkeep
 reports/portfolio/
 !reports/portfolio/.gitkeep
+
+# --- Render deploy: commit the pre-populated SQLite DB and full data folder ---
+# These override the ignore rules above so Render gets the built DB directly.
+!db/nifty100.db
+!data/
+!data/**

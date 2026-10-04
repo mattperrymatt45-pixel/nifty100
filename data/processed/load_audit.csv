@@ -1,0 +1,13 @@
+id,table_name,rows_in,rows_out,rows_rejected,runtime_s,status,loaded_at
+57,stock_prices,5520,5520,0,0.62,OK,2026-08-24T06:48:33Z
+56,financial_ratios,1184,1184,0,0.217,OK,2026-08-24T06:48:33Z
+55,cashflow,1182,1182,0,0.149,OK,2026-08-24T06:48:33Z
+54,balancesheet,1284,1284,0,0.231,OK,2026-08-24T06:48:33Z
+53,profitandloss,1262,1262,0,0.218,OK,2026-08-24T06:48:33Z
+52,market_cap,552,552,0,0.105,OK,2026-08-24T06:48:33Z
+51,documents,1585,1585,0,0.142,OK,2026-08-24T06:48:33Z
+50,prosandcons,16,16,0,0.014,OK,2026-08-24T06:48:33Z
+49,peer_groups,56,56,0,0.017,OK,2026-08-24T06:48:33Z
+48,analysis,20,20,0,0.016,OK,2026-08-24T06:48:33Z
+47,sectors,92,92,0,0.024,OK,2026-08-24T06:48:33Z
+46,companies,92,92,0,0.123,OK,2026-08-24T06:48:33Z
