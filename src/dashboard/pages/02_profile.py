@@ -22,6 +22,8 @@ from src.dashboard.utils.theme import (
     CHART_RED,
     COLORS,
     app_stamp,
+    fy_label,
+    fy_short,
     page_header,
     plotly_chart,
     section_label,
@@ -132,14 +134,14 @@ def _revenue_pat_chart(pl: pd.DataFrame) -> None:
 
     fig = go.Figure()
     fig.add_bar(
-        x=plot_df["year"],
+        x=plot_df["year"].map(fy_short),
         y=plot_df["Revenue"],
         name="Revenue",
         marker_color=CHART_GOLD,
         marker_line_width=0,
     )
     fig.add_bar(
-        x=plot_df["year"],
+        x=plot_df["year"].map(fy_short),
         y=plot_df["Net Profit"],
         name="Net Profit",
         marker_color=CHART_GREEN,
@@ -172,7 +174,7 @@ def _roe_roce_chart(ratios: pd.DataFrame) -> None:
     if roe.notna().any():
         fig.add_trace(
             go.Scatter(
-                x=plot_df.loc[roe.notna(), "year"],
+                x=plot_df.loc[roe.notna(), "year"].map(fy_short),
                 y=roe.dropna(),
                 name="ROE",
                 mode="lines+markers",
@@ -183,7 +185,7 @@ def _roe_roce_chart(ratios: pd.DataFrame) -> None:
     if roce.notna().any():
         fig.add_trace(
             go.Scatter(
-                x=plot_df.loc[roce.notna(), "year"],
+                x=plot_df.loc[roce.notna(), "year"].map(fy_short),
                 y=roce.dropna(),
                 name="ROCE",
                 mode="lines+markers",
@@ -256,7 +258,7 @@ def render() -> None:
         return
 
     latest = ratios.iloc[0]
-    section_label(f"Latest FY Snapshot - {latest['year']}")
+    section_label(f"Latest Snapshot - {fy_label(latest['year'])}")
     _kpi_tiles(latest)
 
     if not pl.empty:

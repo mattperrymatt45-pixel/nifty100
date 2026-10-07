@@ -15,6 +15,7 @@ from src.dashboard.utils.theme import (
     CHART_PALETTE,
     COLORS,
     app_stamp,
+    fy_short,
     number_col,
     page_header,
     plotly_chart,
@@ -109,7 +110,7 @@ def render() -> None:
             "composite_quality_score": ":.1f",
             "market_cap_crore": ":,.0f",
         },
-        title=f"Capital Allocation - FY {latest_year}",
+        title=f"Capital Allocation - {fy_short(latest_year)}",
     )
     fig.update_traces(
         textfont=dict(family="Inter, sans-serif", size=11, color=COLORS["text"]),

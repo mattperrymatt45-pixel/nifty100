@@ -15,6 +15,7 @@ from src.dashboard.utils.theme import (
     CHART_PALETTE,
     COLORS,
     app_stamp,
+    fy_short,
     page_header,
     plotly_chart,
     section_label,
@@ -79,6 +80,7 @@ def render() -> None:
 
     name_row = sub.iloc[0]
     section_label(f"{name_row['company_name']} ({ticker})")
+    display_years = sub["year"].map(fy_short)
 
     fig = go.Figure()
     axis_used = {"y": False, "y2": False}
@@ -92,7 +94,7 @@ def render() -> None:
         color = CHART_PALETTE[i % len(CHART_PALETTE)]
         fig.add_trace(
             go.Scatter(
-                x=sub["year"],
+                x=display_years,
                 y=series,
                 name=mname,
                 mode="lines+markers",
@@ -103,7 +105,7 @@ def render() -> None:
             )
         )
         vals = series.tolist()
-        years = sub["year"].tolist()
+        years = display_years.tolist()
         for j in range(1, len(vals)):
             yoy = _yoy_pct(vals[j - 1], vals[j])
             if yoy and j == len(vals) - 1:
@@ -143,6 +145,7 @@ def render() -> None:
     with st.expander("Data Table"):
         show_cols = ["year"] + [METRICS[m][0] for m in selected]
         tbl = sub[show_cols].copy()
+        tbl["year"] = tbl["year"].map(fy_short)
         tbl.columns = ["Year", *list(selected)]
         for c in tbl.columns[1:]:
             tbl[c] = pd.to_numeric(tbl[c], errors="coerce")

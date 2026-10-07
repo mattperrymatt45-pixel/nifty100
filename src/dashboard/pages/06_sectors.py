@@ -18,6 +18,7 @@ from src.dashboard.utils.theme import (
     COLORS,
     app_stamp,
     fmt_cr,
+    fy_short,
     page_header,
     percent_col,
     plotly_chart,
@@ -68,7 +69,7 @@ def render() -> None:
         },
         size_max=55,
         log_x=True,
-        title=f"{choice} - Revenue vs ROE vs Market Cap (FY {latest_year})",
+        title=f"{choice} - Revenue vs ROE vs Market Cap ({fy_short(latest_year)})",
         color_discrete_sequence=CHART_PALETTE,
     )
     fig.update_traces(marker=dict(line=dict(width=0.5, color=COLORS["bg"]), opacity=0.85))

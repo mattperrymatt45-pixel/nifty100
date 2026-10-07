@@ -16,6 +16,8 @@ from src.dashboard.utils.theme import (
     COLORS,
     app_stamp,
     fmt_cr,
+    fy_label,
+    fy_short,
     number_col,
     page_header,
     percent_col,
@@ -36,13 +38,16 @@ def _year_selector() -> str:
     with st.sidebar:
         st.divider()
         st.markdown("<div class='section-label'>Filters</div>", unsafe_allow_html=True)
-        return st.selectbox(
+        # Format options as human readable FY labels.
+        opt_labels = {fy_short(y): y for y in (options if options else list(available))}
+        chosen = st.selectbox(
             "Financial Year",
-            options=options if options else list(available),
+            options=list(opt_labels.keys()),
             index=0,
-            key="home_year",
+            key="home_fy_label",
             help="KPI tiles, sector composition and top-5 update when changed.",
         )
+        return opt_labels[chosen]
 
 
 def _kpi_tiles(df: pd.DataFrame, year: str) -> None:
@@ -61,7 +66,7 @@ def _kpi_tiles(df: pd.DataFrame, year: str) -> None:
     c4.metric("Constituents", f"{total}")
     c5.metric("Median Rev CAGR 5Y", f"{med_rev_cagr:.2f}%" if pd.notna(med_rev_cagr) else "n/a")
     c6.metric("Debt-Free", f"{debt_free_count}")
-    st.caption(f"Fiscal year ending {year}. Source: financial_ratios, market_cap.")
+    st.caption(f"Data as of {fy_label(year)}. Source: financial_ratios, market_cap.")
 
 
 def _sector_treemap(df: pd.DataFrame) -> None:
@@ -131,11 +136,11 @@ def render() -> None:
     """Render the Overview landing page."""
     year = _year_selector()
 
-    page_header("Market Overview", f"Nifty 100 constituent analytics - FY {year}")
+    page_header("Market Overview", fy_label(year))
 
     df = get_kpis_for_year(year)
     if df.empty:
-        st.warning(f"No data available for {year}. Select another year.")
+        st.warning(f"No data available for {fy_short(year)}. Select another year.")
         return
 
     _kpi_tiles(df, year)

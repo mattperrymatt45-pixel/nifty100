@@ -575,6 +575,83 @@ def text_col(label: str, width: str | None = None) -> st.column_config.TextColum
 
 
 # ---------------------------------------------------------------------------
+# Fiscal-year formatting
+# ---------------------------------------------------------------------------
+# Years are stored in the DB as ``"YYYY-MM"`` (e.g. ``"2024-03"``) denoting the
+# month the FY closes. For Indian markets that is almost always March, giving
+# FY 2023-24. We expose a compact display form ("FY24") and a long form
+# ("FY 2023-24") for headers/legends.
+_FY_MONTH_TO_LABEL = {
+    "01": "Jan",
+    "02": "Feb",
+    "03": "Mar",
+    "04": "Apr",
+    "05": "May",
+    "06": "Jun",
+    "07": "Jul",
+    "08": "Aug",
+    "09": "Sep",
+    "10": "Oct",
+    "11": "Nov",
+    "12": "Dec",
+}
+
+
+def _fiscal_year_end(year: int, month: int) -> int:
+    """Return the calendar year in which the Indian financial year ends."""
+    return year if month <= 3 else year + 1
+
+
+def _parse_period(value: object) -> tuple[int, int] | None:
+    """Parse an ISO year-month financial period; return ``None`` if invalid."""
+    if value is None:
+        return None
+    s = str(value)
+    if len(s) != 7 or s[4] != "-":
+        return None
+    try:
+        year, month = int(s[:4]), int(s[5:7])
+    except ValueError:
+        return None
+    if not 1 <= month <= 12:
+        return None
+    return year, month
+
+
+def fy_short(year: object) -> str:
+    """Return a compact Indian FY label, e.g. ``2024-03`` -> ``"FY24"``.
+
+    The stored year-month is the period end. April through December belong
+    to the following March-ending FY; January through March use that same
+    calendar year as the FY end.
+    """
+    parsed = _parse_period(year)
+    if parsed is None:
+        return "" if year is None else str(year)
+    fy_end = _fiscal_year_end(*parsed)
+    return f"FY{fy_end % 100:02d}"
+
+
+def fy_long(year: object) -> str:
+    """Return an explicit Indian FY label, e.g. ``2024-03`` -> ``FY 2023-24``."""
+    parsed = _parse_period(year)
+    if parsed is None:
+        return "" if year is None else str(year)
+    fy_end = _fiscal_year_end(*parsed)
+    return f"FY {fy_end - 1}-{fy_end % 100:02d}"
+
+
+def fy_label(year: object) -> str:
+    """Return a prose caption, e.g. ``2024-03`` -> ``FY 2023-24 (Mar 2024)``."""
+    parsed = _parse_period(year)
+    if parsed is None:
+        return "" if year is None else str(year)
+    calendar_year, month = parsed
+    month_name = _FY_MONTH_TO_LABEL.get(f"{month:02d}", f"{month:02d}")
+    return f"{fy_long(year)} ({month_name} {calendar_year})"
+
+
+# ---------------------------------------------------------------------------
 # Conditional-format helpers
 # ---------------------------------------------------------------------------
 def style_dataframe(
